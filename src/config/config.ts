@@ -48,9 +48,10 @@ export type Config = {
   upstreamNoisePatterns?: string[];
 };
 
-/** Path tới config.json (global-only, ~/.pi/agent/huly/). */
-export const CONFIG_DIR = join(homedir(), ".pi", "agent", "huly");
+/** Path tới config.json (omp, ~/.omp/agent/huly/). */
+export const CONFIG_DIR = join(homedir(), ".omp", "agent", "huly");
 export const CONFIG_PATH = join(CONFIG_DIR, "config.json");
+export const LEGACY_CONFIG_PATH = join(homedir(), ".pi", "agent", "huly", "config.json");
 
 /** Default config khi file không tồn tại hoặc thiếu transport field. */
 export const DEFAULT_CONFIG: Config = {
@@ -81,24 +82,93 @@ export function normalizePath(p: string): string {
  * - File không tồn tại → return DEFAULT_CONFIG
  * - File malformed/schema invalid → throw
  * - transport thiếu → default 'ws'
+ * - Legacy ~/.pi config merged if exists (omp wins on collision)
  */
-export async function loadConfig(filePath: string = CONFIG_PATH): Promise<Config> {
+export async function loadConfig(
+  filePath: string = CONFIG_PATH,
+  legacyPath: string = LEGACY_CONFIG_PATH,
+): Promise<Config> {
+  let ompCfg: Config;
   if (!existsSync(filePath)) {
-    return { ...DEFAULT_CONFIG, projects: {} };
+    ompCfg = { ...DEFAULT_CONFIG, projects: {} };
+  } else {
+    let raw: string;
+    try {
+      raw = await readFile(filePath, "utf8");
+    } catch (e) {
+      throw new Error(`config.json read failed: ${(e as Error).message}`);
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      throw new Error(`config.json malformed JSON: ${(e as Error).message}`);
+    }
+    ompCfg = validateConfig(parsed);
   }
-  let raw: string;
-  try {
-    raw = await readFile(filePath, "utf8");
-  } catch (e) {
-    throw new Error(`config.json read failed: ${(e as Error).message}`);
+
+  // Try migrating from legacy ~/.pi config
+  if (existsSync(legacyPath)) {
+    try {
+      let raw: string;
+      try {
+        raw = await readFile(legacyPath, "utf8");
+      } catch (e) {
+        throw new Error(`legacy config.json read failed: ${(e as Error).message}`);
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        throw new Error(`legacy config.json malformed JSON: ${(e as Error).message}`);
+      }
+      const legacyCfg = validateConfig(parsed);
+
+      let migrated = false;
+
+      // Merge legacy projects missing from omp (omp wins on key collision)
+      for (const [cwd, binding] of Object.entries(legacyCfg.projects)) {
+        if (!(cwd in ompCfg.projects)) {
+          ompCfg.projects[cwd] = binding;
+          migrated = true;
+        }
+      }
+
+      // Merge transport only if absent in omp (omp wins)
+      if (ompCfg.transport === DEFAULT_CONFIG.transport && legacyCfg.transport !== DEFAULT_CONFIG.transport) {
+        ompCfg.transport = legacyCfg.transport;
+        migrated = true;
+      }
+
+      // Merge pool only if absent in omp (omp wins)
+      if (legacyCfg.pool && !ompCfg.pool) {
+        ompCfg.pool = legacyCfg.pool;
+        migrated = true;
+      }
+
+      // Merge quietUpstreamNoise only if absent in omp (omp wins)
+      if (legacyCfg.quietUpstreamNoise !== undefined && ompCfg.quietUpstreamNoise === undefined) {
+        ompCfg.quietUpstreamNoise = legacyCfg.quietUpstreamNoise;
+        migrated = true;
+      }
+
+      // Merge upstreamNoisePatterns only if absent in omp (omp wins)
+      if (legacyCfg.upstreamNoisePatterns && !ompCfg.upstreamNoisePatterns) {
+        ompCfg.upstreamNoisePatterns = legacyCfg.upstreamNoisePatterns;
+        migrated = true;
+      }
+
+      // Persist merged config if anything changed
+      if (migrated) {
+        await saveConfig(ompCfg, filePath);
+      }
+    } catch (e) {
+      // Silently ignore legacy migration errors — omp config takes precedence
+      console.warn(`Failed to migrate legacy config from ${legacyPath}: ${(e as Error).message}`);
+    }
   }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (e) {
-    throw new Error(`config.json malformed JSON: ${(e as Error).message}`);
-  }
-  return validateConfig(parsed);
+
+  return ompCfg;
 }
 
 /** Validate + normalize parsed config object. */
@@ -232,7 +302,7 @@ export async function bindProject(
   if (typeof binding.project !== "string" || binding.project.length === 0) {
     throw new Error("bindProject: project required");
   }
-  const config = await loadConfig(filePath);
+  const config = await loadConfig(filePath, "");
   config.projects[normalizePath(cwd)] = binding;
   await saveConfig(config, filePath);
 }
@@ -241,7 +311,7 @@ export async function bindProject(
  * Unbind cwd. No-op nếu cwd không tồn tại.
  */
 export async function unbindProject(cwd: string, filePath: string = CONFIG_PATH): Promise<void> {
-  const config = await loadConfig(filePath);
+  const config = await loadConfig(filePath, "");
   const normalized = normalizePath(cwd);
   if (!(normalized in config.projects)) return;
   delete config.projects[normalized];
@@ -260,7 +330,7 @@ export async function resolveByCwd(
   cwd: string,
   filePath: string = CONFIG_PATH,
 ): Promise<ProjectBinding | undefined> {
-  const config = await loadConfig(filePath);
+  const config = await loadConfig(filePath, "");
   const normalizedCwd = normalizePath(cwd);
   const bindings = Object.entries(config.projects);
   if (bindings.length === 0) return undefined;

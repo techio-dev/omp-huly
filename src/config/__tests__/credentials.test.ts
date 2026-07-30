@@ -17,6 +17,7 @@ import {
 
 const TEST_DIR = join(tmpdir(), `pi-huly-test-${process.pid}`);
 const TEST_PATH = join(TEST_DIR, "credentials.json");
+const NONEXISTENT_PATH = join(tmpdir(), `nonexistent-${process.pid}`, "credentials.json");
 
 async function writeCreds(path: string, content: string, mode = 0o600): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -45,19 +46,19 @@ describe("loadCredentials", () => {
   });
 
   it("returns empty Credentials when file does not exist", async () => {
-    const creds = await loadCredentials(TEST_PATH);
+    const creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(creds).toEqual({ version: 1, workspaces: {} });
   });
 
   it("parses file with single workspace using token auth", async () => {
     await writeCreds(TEST_PATH, JSON.stringify({ version: 1, workspaces: { myteam: tokenWs } }));
-    const creds = await loadCredentials(TEST_PATH);
+    const creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(creds.workspaces.myteam).toEqual(tokenWs);
   });
 
   it("parses file with single workspace using email+password auth", async () => {
     await writeCreds(TEST_PATH, JSON.stringify({ version: 1, workspaces: { corp: emailWs } }));
-    const creds = await loadCredentials(TEST_PATH);
+    const creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(creds.workspaces.corp).toEqual(emailWs);
   });
 
@@ -72,18 +73,18 @@ describe("loadCredentials", () => {
         },
       }),
     );
-    const creds = await loadCredentials(TEST_PATH);
+    const creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(Object.keys(creds.workspaces).sort()).toEqual(["ws1", "ws2"]);
   });
 
   it("throws when file has loose permissions (mode 644)", async () => {
     await writeCreds(TEST_PATH, JSON.stringify({ version: 1, workspaces: {} }), 0o644);
-    await expect(loadCredentials(TEST_PATH)).rejects.toThrow(/permissions too open|chmod|600/i);
+    await expect(loadCredentials(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/permissions too open|chmod|600/i);
   });
 
   it("throws when file is malformed JSON", async () => {
     await writeCreds(TEST_PATH, "{ not valid json");
-    await expect(loadCredentials(TEST_PATH)).rejects.toThrow(/malformed|json|parse/i);
+    await expect(loadCredentials(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/malformed|json|parse/i);
   });
 
   it("throws when workspace entry missing required `workspace` field", async () => {
@@ -97,7 +98,7 @@ describe("loadCredentials", () => {
         },
       }),
     );
-    await expect(loadCredentials(TEST_PATH)).rejects.toThrow(/workspace required|schema invalid/i);
+    await expect(loadCredentials(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/workspace required|schema invalid/i);
   });
 
   it("throws when workspace entry has BOTH token and email+password", async () => {
@@ -117,7 +118,7 @@ describe("loadCredentials", () => {
         },
       }),
     );
-    await expect(loadCredentials(TEST_PATH)).rejects.toThrow(/XOR|auth union|both/i);
+    await expect(loadCredentials(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/XOR|auth union|both/i);
   });
 
   it("throws when workspace entry has NEITHER token nor email+password", async () => {
@@ -139,7 +140,7 @@ describe("loadCredentials", () => {
 
 // Helper wrapper cho test NEITHER (tránh lint duplicate regex)
 async function loadFromNeither(): Promise<Credentials> {
-  return loadCredentials(TEST_PATH);
+  return loadCredentials(TEST_PATH, NONEXISTENT_PATH);
 }
 
 describe("saveCredentials", () => {
@@ -175,7 +176,7 @@ describe("saveCredentials", () => {
   it("writes JSON readable by loadCredentials (round-trip)", async () => {
     const creds: Credentials = { version: 1, workspaces: { myteam: tokenWs, corp: emailWs } };
     await saveCredentials(creds, TEST_PATH);
-    const loaded = await loadCredentials(TEST_PATH);
+    const loaded = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(loaded).toEqual(creds);
   });
 
@@ -198,7 +199,7 @@ describe("saveCredentials", () => {
     await writeFile(staleTmp, "stale data", "utf8");
     await saveCredentials({ version: 1, workspaces: { myteam: tokenWs } }, TEST_PATH);
     // Sau save: stale temp overwritten + renamed, file đích có content mới
-    const loaded = await loadCredentials(TEST_PATH);
+    const loaded = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(loaded.workspaces.myteam).toEqual(tokenWs);
   });
 });
@@ -213,17 +214,17 @@ describe("loadCredentials — strict mode enforcement", () => {
 
   it("rejects mode 700 (owner-only but != 600, strict equality)", async () => {
     await writeCreds(TEST_PATH, JSON.stringify({ version: 1, workspaces: {} }), 0o700);
-    await expect(loadCredentials(TEST_PATH)).rejects.toThrow(/permissions too open|chmod|600/i);
+    await expect(loadCredentials(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/permissions too open|chmod|600/i);
   });
 
   it("rejects mode 666 (world-writable)", async () => {
     await writeCreds(TEST_PATH, JSON.stringify({ version: 1, workspaces: {} }), 0o666);
-    await expect(loadCredentials(TEST_PATH)).rejects.toThrow(/permissions too open|chmod|600/i);
+    await expect(loadCredentials(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/permissions too open|chmod|600/i);
   });
 
   it("rejects mode 640 (group-readable)", async () => {
     await writeCreds(TEST_PATH, JSON.stringify({ version: 1, workspaces: {} }), 0o640);
-    await expect(loadCredentials(TEST_PATH)).rejects.toThrow(/permissions too open|chmod|600/i);
+    await expect(loadCredentials(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/permissions too open|chmod|600/i);
   });
 });
 
@@ -251,7 +252,7 @@ describe("loadCredentials — partial auth field rejection", () => {
         },
       }),
     );
-    await expect(loadCredentials(TEST_PATH)).rejects.toThrow(/partial email\/password|XOR/i);
+    await expect(loadCredentials(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/partial email\/password|XOR/i);
   });
 
   it("rejects {email} without password (partial field leak prevention)", async () => {
@@ -268,7 +269,7 @@ describe("loadCredentials — partial auth field rejection", () => {
         },
       }),
     );
-    await expect(loadCredentials(TEST_PATH)).rejects.toThrow(
+    await expect(loadCredentials(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(
       /partial email\/password|XOR|neither/i,
     );
   });
@@ -284,13 +285,13 @@ describe("addWorkspace", () => {
 
   it("adds new workspace with explicit id", async () => {
     await addWorkspace("myteam", tokenWs, TEST_PATH);
-    const creds = await loadCredentials(TEST_PATH);
+    const creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(creds.workspaces.myteam).toEqual(tokenWs);
   });
 
   it("defaults id to workspace name when id omitted", async () => {
     await addWorkspace(undefined, tokenWs, TEST_PATH);
-    const creds = await loadCredentials(TEST_PATH);
+    const creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(creds.workspaces.myteam).toEqual(tokenWs);
   });
 
@@ -298,7 +299,7 @@ describe("addWorkspace", () => {
     await addWorkspace("myteam", tokenWs, TEST_PATH);
     const updated: WorkspaceCreds = { ...tokenWs, token: "new-token" };
     await addWorkspace("myteam", updated, TEST_PATH);
-    const creds = await loadCredentials(TEST_PATH);
+    const creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     // Union narrowing: extract token qua type guard thay vì direct access
     const ws = creds.workspaces.myteam;
     expect("token" in ws && ws.token).toBe("new-token");
@@ -343,7 +344,7 @@ describe("removeWorkspace", () => {
     await addWorkspace("myteam", tokenWs, TEST_PATH);
     await addWorkspace("corp", emailWs, TEST_PATH);
     await removeWorkspace("myteam", TEST_PATH);
-    const creds = await loadCredentials(TEST_PATH);
+    const creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(creds.workspaces.myteam).toBeUndefined();
     expect(creds.workspaces.corp).toEqual(emailWs);
   });
@@ -351,7 +352,7 @@ describe("removeWorkspace", () => {
   it("is no-op when id does not exist", async () => {
     await addWorkspace("myteam", tokenWs, TEST_PATH);
     await expect(removeWorkspace("nonexistent", TEST_PATH)).resolves.toBeUndefined();
-    const creds = await loadCredentials(TEST_PATH);
+    const creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(creds.workspaces.myteam).toEqual(tokenWs);
   });
 
@@ -359,7 +360,7 @@ describe("removeWorkspace", () => {
     await addWorkspace("myteam", tokenWs, TEST_PATH);
     await removeWorkspace("myteam", TEST_PATH);
     expect(existsSync(TEST_PATH)).toBe(true);
-    const creds = await loadCredentials(TEST_PATH);
+    const creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(creds.workspaces).toEqual({});
   });
 });
@@ -436,7 +437,7 @@ describe("integration: full flow", () => {
 
   it("load empty → add 2 workspaces → save → reload round-trip", async () => {
     // Start empty
-    let creds = await loadCredentials(TEST_PATH);
+    let creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(creds.workspaces).toEqual({});
 
     // Add 2 workspaces (different auth methods)
@@ -444,7 +445,7 @@ describe("integration: full flow", () => {
     await addWorkspace("corp", emailWs, TEST_PATH);
 
     // Reload + verify both present
-    creds = await loadCredentials(TEST_PATH);
+    creds = await loadCredentials(TEST_PATH, NONEXISTENT_PATH);
     expect(Object.keys(creds.workspaces).sort()).toEqual(["corp", "myteam"]);
     expect(creds.workspaces.myteam).toEqual(tokenWs);
     expect(creds.workspaces.corp).toEqual(emailWs);

@@ -33,9 +33,10 @@ export type Credentials = {
   workspaces: Record<string, WorkspaceCreds>;
 };
 
-/** Path tới credentials.json (global-only, ~/.pi/agent/huly/). */
-export const CREDENTIALS_DIR = join(homedir(), ".pi", "agent", "huly");
+/** Path tới credentials.json (omp, ~/.omp/agent/huly/). */
+export const CREDENTIALS_DIR = join(homedir(), ".omp", "agent", "huly");
 export const CREDENTIALS_PATH = join(CREDENTIALS_DIR, "credentials.json");
+export const LEGACY_CREDENTIALS_PATH = join(homedir(), ".pi", "agent", "huly", "credentials.json");
 
 /** File mode cho credentials.json (rw owner only — 08 §A Spoofing mitigation). */
 const SECURE_MODE = 0o600;
@@ -109,11 +110,64 @@ async function verifySecureMode(filePath: string, st: { mode: number }): Promise
  * - File loose perms → throw (08 §A)
  * - File malformed JSON → throw
  * - File schema invalid → throw
+ * - Legacy ~/.pi credentials merged if exists (omp wins on collision)
  */
-export async function loadCredentials(filePath: string = CREDENTIALS_PATH): Promise<Credentials> {
+export async function loadCredentials(
+  filePath: string = CREDENTIALS_PATH,
+  legacyPath: string = LEGACY_CREDENTIALS_PATH,
+): Promise<Credentials> {
   if (!existsSync(filePath)) {
-    return { version: 1, workspaces: {} };
+    const ompCreds = { version: 1 as const, workspaces: {} as Record<string, WorkspaceCreds> };
+    // Try migrating from legacy ~/.pi if omp store absent
+    if (existsSync(legacyPath)) {
+      try {
+        const st = await stat(legacyPath);
+        await verifySecureMode(legacyPath, st);
+        let raw: string;
+        try {
+          raw = await readFile(legacyPath, "utf8");
+        } catch (e) {
+          throw new Error(`legacy credentials.json read failed: ${(e as Error).message}`);
+        }
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch (e) {
+          throw new Error(`legacy credentials.json malformed JSON: ${(e as Error).message}`);
+        }
+        if (typeof parsed !== "object" || parsed === null) {
+          throw new Error("legacy credentials.json schema invalid: root must be an object");
+        }
+        const root = parsed as Record<string, unknown>;
+        if (root.version !== 1) {
+          throw new Error(`legacy credentials.json schema invalid: version must be 1 (got ${root.version})`);
+        }
+        if (typeof root.workspaces !== "object" || root.workspaces === null) {
+          throw new Error("legacy credentials.json schema invalid: workspaces must be an object");
+        }
+        const workspaces = root.workspaces as Record<string, unknown>;
+        // Validate each legacy entry and migrate to omp store
+        let migrated = false;
+        for (const [id, entry] of Object.entries(workspaces)) {
+          // Only migrate if not already in omp store (omp wins on collision)
+          if (!(id in ompCreds.workspaces)) {
+            validateWorkspace(id, entry);
+            ompCreds.workspaces[id] = entry as WorkspaceCreds;
+            migrated = true;
+          }
+        }
+        // Persist migrated entries to omp store (atomic + chmod 600)
+        if (migrated) {
+          await saveCredentials(ompCreds, filePath);
+        }
+      } catch (e) {
+        // Silently ignore legacy migration errors — omp store takes precedence
+        console.warn(`Failed to migrate legacy credentials from ${legacyPath}: ${(e as Error).message}`);
+      }
+    }
+    return ompCreds;
   }
+
   const st = await stat(filePath);
   await verifySecureMode(filePath, st);
   let raw: string;
@@ -143,7 +197,57 @@ export async function loadCredentials(filePath: string = CREDENTIALS_PATH): Prom
   for (const [id, entry] of Object.entries(workspaces)) {
     validateWorkspace(id, entry);
   }
-  return { version: 1, workspaces: workspaces as Record<string, WorkspaceCreds> };
+  const ompCreds = { version: 1 as const, workspaces: workspaces as Record<string, WorkspaceCreds> };
+
+  // After loading omp store, try migrating any missing entries from legacy
+  if (existsSync(legacyPath)) {
+    try {
+      const st = await stat(legacyPath);
+      await verifySecureMode(legacyPath, st);
+      let raw: string;
+      try {
+        raw = await readFile(legacyPath, "utf8");
+      } catch (e) {
+        throw new Error(`legacy credentials.json read failed: ${(e as Error).message}`);
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        throw new Error(`legacy credentials.json malformed JSON: ${(e as Error).message}`);
+      }
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("legacy credentials.json schema invalid: root must be an object");
+      }
+      const root = parsed as Record<string, unknown>;
+      if (root.version !== 1) {
+        throw new Error(`legacy credentials.json schema invalid: version must be 1 (got ${root.version})`);
+      }
+      if (typeof root.workspaces !== "object" || root.workspaces === null) {
+        throw new Error("legacy credentials.json schema invalid: workspaces must be an object");
+      }
+      const workspaces = root.workspaces as Record<string, unknown>;
+      // Validate each legacy entry and merge missing ones into omp store
+      let migrated = false;
+      for (const [id, entry] of Object.entries(workspaces)) {
+        // Only migrate if not already in omp store (omp wins on collision)
+        if (!(id in ompCreds.workspaces)) {
+          validateWorkspace(id, entry);
+          ompCreds.workspaces[id] = entry as WorkspaceCreds;
+          migrated = true;
+        }
+      }
+      // Persist merged entries to omp store (atomic + chmod 600)
+      if (migrated) {
+        await saveCredentials(ompCreds, filePath);
+      }
+    } catch (e) {
+      // Silently ignore legacy migration errors — omp store takes precedence
+      console.warn(`Failed to migrate legacy credentials from ${legacyPath}: ${(e as Error).message}`);
+    }
+  }
+
+  return ompCreds;
 }
 
 /**
@@ -181,7 +285,7 @@ export async function addWorkspace(
   const resolvedId = id ?? entry.workspace;
   // Validate entry trước (throws nếu invalid — KHÔNG touch file)
   validateWorkspace(resolvedId, entry);
-  const creds = await loadCredentials(filePath);
+  const creds = await loadCredentials(filePath, "");
   creds.workspaces[resolvedId] = entry;
   await saveCredentials(creds, filePath);
 }
@@ -194,7 +298,7 @@ export async function removeWorkspace(
   id: string,
   filePath: string = CREDENTIALS_PATH,
 ): Promise<void> {
-  const creds = await loadCredentials(filePath);
+  const creds = await loadCredentials(filePath, "");
   if (!(id in creds.workspaces)) return;
   delete creds.workspaces[id];
   await saveCredentials(creds, filePath);
@@ -207,7 +311,7 @@ export async function getWorkspace(
   id: string,
   filePath: string = CREDENTIALS_PATH,
 ): Promise<WorkspaceCreds | undefined> {
-  const creds = await loadCredentials(filePath);
+  const creds = await loadCredentials(filePath, "");
   return creds.workspaces[id];
 }
 
@@ -219,7 +323,7 @@ export async function findByName(
   name: string,
   filePath: string = CREDENTIALS_PATH,
 ): Promise<Array<WorkspaceCreds & { id: string }>> {
-  const creds = await loadCredentials(filePath);
+  const creds = await loadCredentials(filePath, "");
   return Object.entries(creds.workspaces)
     .filter(([, entry]) => entry.workspace === name)
     .map(([id, entry]) => ({ id, ...entry }));
