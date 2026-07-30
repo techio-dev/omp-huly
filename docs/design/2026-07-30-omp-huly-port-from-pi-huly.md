@@ -39,7 +39,7 @@ Source of truth: omp `docs/extensions.md`, `docs/sdk.md`, `docs/skills.md`,
   mechanism needs no change.**
 - Events pi-huly uses all exist in omp with identical names:
   `session_start`, `session_shutdown`, `tool_execution_start`. (omp handler
-  signatures are `(event, ctx)`.)
+  signatures are `(event, ctx)`.) **Caveat (verified by review):** event *names* match, but the `session_start` *payload* differs — omp's `SessionStartEvent` is `{ type: "session_start" }` with **no `reason` field** (pi-huly filters pool-warming by `event.reason`). So Task 5 warms unconditionally on `session_start`. `tool_execution_start` keeps `toolName` + `args`; `session_shutdown` is arg-free.
 - Confirm gate: pi-huly's `confirmDestructive(ctx, c)` uses `ctx.hasUI` +
   `ctx.ui.confirm(title, message)` → **directly omp-compatible** (omp interactive
   mode supports `ctx.ui.confirm`; non-TUI auto-deny via `ctx.hasUI === false` holds).

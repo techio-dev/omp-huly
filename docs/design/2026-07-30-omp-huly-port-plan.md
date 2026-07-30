@@ -20,6 +20,7 @@
 - **Imports:** re-namespace `@earendil-works/pi-coding-agent` → `@oh-my-pi/pi-coding-agent`, `@earendil-works/pi-tui` → `@oh-my-pi/pi-tui`. omp still accepts the `"pi"` manifest key as fallback, but we use canonical `"omp"`.
 - **Do not touch host-agnostic logic:** `src/client/*`, `src/markup/*`, `src/config/resolver.ts`, `src/tools/confirm.ts`, `src/tools/domains/*.ts` handler bodies, the `defineHulyTool.execute` body. Only their imports/schemas/config-paths change.
 - **Security invariant (config migration):** credentials writes stay atomic + chmod 0o600; never log token/password; legacy `~/.pi` reads honored only if chmod-600 valid.
+- **Zod import:** use `import { z } from "zod"` (resolves to zod v4 "Classic"). omp detects tool schemas by duck-typing (`_zod` + `.parse`), so direct import is canonical & compatible (verified by review).
 
 ---
 
@@ -113,7 +114,7 @@ git commit -m "build(omp-huly): rename package, omp manifest, add zod, re-namesp
 
 ### Task 2: Import re-namespace `@earendil-works/*` → `@oh-my-pi/*`
 
-**Files (exact, 11 files, 19 sites):**
+**Files (exact, 14 files, 19 sites):**
 - Modify: `src/index.ts`, `src/commands/huly.ts`, `src/tools/builder.ts`, `src/tools/confirm.ts`, `src/tools/register.ts`, `src/render/document.ts`, `src/render/issue.ts`, `src/render/util.ts`, `src/__tests__/e2e-live-domains.test.ts`, `src/__tests__/e2e-live-hunt3.test.ts`, `src/__tests__/e2e-live.test.ts`, `src/__tests__/e2e-smoke.test.ts`, `src/render/__tests__/document.test.ts`, `src/render/__tests__/issue.test.ts`
 
 **Interfaces:**
@@ -298,7 +299,7 @@ git commit -m "feat(config): move store to ~/.omp/agent/huly + legacy ~/.pi auto
 
 **Files (23 non-test files):**
 - `src/tools/builder.ts`
-- `src/tools/domains/_common.ts`, `_class-refs.ts`, `_entity-types.ts`
+- `src/tools/domains/_common.ts` (shared schemas — convert), `_class-refs.ts` + `_entity-types.ts` (verify only — no schemas; hold Huly `_class`/type refs)
 - `src/tools/domains/{workspace,projects,milestones,task-management,components,spaces,document-snapshots,labels,tags,tag-categories,comments,search,deletion,time,contacts,documents,issues-core,issues-relations,issues-templates,attachments,todos}.ts`
 
 **Interfaces:**
@@ -318,6 +319,10 @@ git commit -m "feat(config): move store to ~/.omp/agent/huly + legacy ~/.pi auto
 | `Type.Integer({ minimum: 1 })` | `z.number().int().min(1)` |
 | `Type.Number()` | `z.number()` |
 | `Type.Boolean()` | `z.boolean()` |
+| `Type.Boolean({ description: "x" })` | `z.boolean().describe("x")` |
+| `Type.String({ description, minLength: N, maxLength: M })` | `z.string().describe("...").min(N).max(M)` |
+| `Type.Number({ description, minimum: N })` | `z.number().describe("...").min(N)` |
+| `Type.Integer({ description, minimum: N })` | `z.number().int().describe("...").min(N)` |
 | `Type.Optional(X)` | `z.optional(X)` (or `X.optional()`) |
 | `Type.Union([Type.Literal("a"), Type.Literal("b")])` | `z.enum(["a", "b"])` |
 | `Type.Union([A, B])` (non-literal) | `z.union([A, B])` |
@@ -327,7 +332,7 @@ git commit -m "feat(config): move store to ~/.omp/agent/huly + legacy ~/.pi auto
 | `Type.Unknown()` | `z.unknown()` |
 | `Type.Null()` | `z.null()` |
 | `Type.Any()` | `z.unknown()` (prefer over `z.any`) |
-| type alias `TObject` | `z.ZodObject` (use `z.AnyZodObject` if variance issues) |
+| type alias `TObject` | `z.ZodObject<z.ZodRawShape>` (`z.AnyZodObject` was REMOVED in zod v4) |
 | type alias `TOptional<TString>` | `z.ZodOptional<z.ZodString>` (or just annotate the const with `z.ZodType`) |
 | `Static<P>` | `z.infer<P>` |
 
@@ -336,9 +341,9 @@ git commit -m "feat(config): move store to ~/.omp/agent/huly + legacy ~/.pi auto
 - [ ] **Step 1: Convert `builder.ts`**
 
 1. `import type { Static, TObject } from "typebox"` → `import { z } from "zod"`.
-2. `export type ToolParams = TObject;` → `export type ToolParams = z.AnyZodObject;`
+2. `export type ToolParams = TObject;` → `export type ToolParams = z.ZodObject<z.ZodRawShape>;` — **NOT `z.AnyZodObject`** (removed in zod v4; `z.ZodObject<z.ZodRawShape>` is the equivalent of "any object schema").
 3. Every `Static<P>` → `z.infer<P>` (in `DefineHulyToolOptions.handler`, `HulyToolDefinition.execute`, `destructiveContext`).
-4. `parameters: P` stays (now `P extends z.AnyZodObject`).
+4. `parameters: P` stays (now `P extends z.ZodObject<z.ZodRawShape>`).
 5. The `execute` body is unchanged (host-agnostic).
 
 - [ ] **Step 2: Convert `_class-refs.ts` and `_entity-types.ts`**
@@ -352,6 +357,8 @@ Apply the rule table to all `Type.*` schemas (`workspaceParam`, `projectParam`, 
 - [ ] **Step 4: Convert the 20 domain files**
 
 For each of the 20 domain files listed above, apply the rule table to every `Type.*` call inside `defineHulyTool({ parameters: Type.Object({...}), ... })`. Do NOT touch handler bodies, imports of `_class-refs`/`_entity-types`/`_common` consts, or `defineHulyTool` options other than `parameters`.
+
+**Also convert typebox usage in tests:** `grep -rln 'from "typebox"\|Type\.' src/**/__tests__` and convert every match — notably `src/tools/__tests__/builder.test.ts` builds `Type.Object({...})` schemas fed into `defineHulyTool`, which would fail the `P extends z.ZodObject<z.ZodRawShape>` constraint after migration. Tests assert tool *behavior*, not schema shapes, so assertions stay valid; only schema construction changes.
 
 - [ ] **Step 5: Remove `typebox` from devDependencies**
 
@@ -398,6 +405,7 @@ In the omp package types (`node_modules/@oh-my-pi/pi-coding-agent/.../extensibil
 - `pi.on("session_shutdown", async () => { await closeAll(); ... })` — unchanged (ignores args).
 - `pi.on("session_start", (event) => { if (!WARM_REASONS.has(event.reason)) return; void warmPool(); })` — adjust `event.reason` to the omp field if different. If omp has no per-start reason, warm unconditionally on `session_start` (document the deviation).
 - `pi.on("tool_execution_start", (event) => logToolCall(event))` — adjust `event.toolName` / `event.args` to omp's field names if different.
+- **Factory return type:** change `export default function setup(pi: ExtensionAPI): number` → `: void`. omp's `ExtensionFactory` is `(pi) => void | Promise<void>`; returning a count is tolerated by TS's void-return rule but make it explicit.
 
 - [ ] **Step 3: Typecheck + tests + build**
 
@@ -549,7 +557,17 @@ Confirm `renderResult(result: AgentToolResult, options: ToolRenderResultOptions,
 
 - [ ] **Step 2: Adapt `RENDER_HOOKS` in `index.ts`**
 
-Change the `RenderHook` type's last param from `{ lastComponent?: Component }` to omp's `args` shape. Update the 3 hook functions' signatures accordingly. If `lastComponent` was used, find the omp equivalent (likely via `options` or omitted).
+Change the `RenderHook` type's last param from `{ lastComponent?: Component }` to omp's `args` shape. Update the 3 hook functions' signatures accordingly. If `lastComponent` was used, find the omp equivalent (likely via `options` or omitted). Concretely:
+
+```ts
+// omp ToolDefinition.renderResult(result, options, theme, args)
+type RenderHook = (
+  result: AgentToolResult<unknown>,
+  options: ToolRenderResultOptions,
+  theme: unknown,
+  args: unknown, // omp passes the tool's parsed args; pi-huly previously read { lastComponent? }
+) => Component;
+```
 
 - [ ] **Step 3: Typecheck + render tests + build**
 
@@ -591,4 +609,12 @@ git add -A && git commit -m "docs(confirm): note omp approval-field alternative 
 
 - **Spec coverage:** §3.2 divergence table → Tasks 1-5,7. §4.2.5 config migration → Task 3. §4.2.6 skills → Task 6. §5 Phase 1 exit criteria → Task 8. §5 Phase 2 → Tasks 9-10. §6 R1→Task 8 Step 6, R2→Task 2 Step 3, R3→Task 8 Step 5, R4→Task 3. All covered.
 - **Placeholder scan:** none. Every step has exact files + commands/code. Task 5 Step 1 / Task 9 Step 1 are "inspect then adapt" — intentional (omp payload/`Component` shapes must be read from the installed package at execution time, not guessed).
-- **Type consistency:** `ToolParams = z.AnyZodObject` (Task 4 Step 1) consumed by every domain `parameters: P` (Task 4 Step 4) — consistent. `loadCredentials(ompPath, legacyPath)` signature (Task 3 Step 1 test) matches implementation (Task 3 Step 3) — consistent.
+- **Type consistency:** `ToolParams = z.ZodObject<z.ZodRawShape>` (Task 4 Step 1 — corrected from `z.AnyZodObject`, which does NOT exist in zod v4) consumed by every domain `parameters: P` (Task 4 Step 4) — consistent. `loadCredentials(ompPath, legacyPath)` signature (Task 3 Step 1 test) matches implementation (Task 3 Step 3) — consistent. Test files using typebox (`builder.test.ts`) are converted in Task 4 Step 4.
+
+## Review revisions (independent subagent review, 2026-07-30)
+
+Three independent reviewers ran (omp-API librarian; spec-coverage; Zod-conversion) and verified claims against real omp source + pi-huly source. Fixes applied to this plan:
+- **P0:** `z.AnyZodObject` → `z.ZodObject<z.ZodRawShape>` (removed in zod v4) — flagged by two reviewers independently.
+- **P1:** added missing conversion rows (`Type.Boolean/String/Number/Integer` with `description`/`min`/`max` constraints).
+- **P2:** Task 4 now converts typebox in test files (`builder.test.ts`); Task 2 file count 11→14; Task 4 file list annotates non-schema files; Task 5 factory return `: void`; Task 9 Step 2 gets a concrete `RenderHook` type.
+- **Verified by review (no action needed):** R1 holds — omp duck-types Zod schemas via `_zod` + `.parse`, so direct `import { z } from "zod"` works without `pi.zod`. All omp API claims + exports (`ExtensionAPI`, `AgentToolResult`, `ToolRenderResultOptions`, `ExtensionContext`, `Component`, events) confirmed against omp source. `session_start` payload is `{ type: "session_start" }` with NO `reason` field → Task 5 warms unconditionally. `tool_execution_start` has `toolName` + `args`. Spec fully covered (no gaps, no scope-creep).
