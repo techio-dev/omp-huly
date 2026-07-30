@@ -323,7 +323,7 @@ describe("T-79: get_todo doneOn field (#102)", () => {
       done: true,
       owner: "emp-1",
       dueDate: 1800000000000,
-      priority: 0,
+      priority: "no-priority", // T-103 #164: numeric 0 → label
     });
   });
 
@@ -422,8 +422,8 @@ describe("T-79: delete_todo ProjectToDo class + counter dec (#102)", () => {
   });
 });
 
-describe("T-103 #106: update_todo description updateMarkup + fields", () => {
-  it("description → updateMarkup (KHÔNG uploadMarkup/createMarkup — mirror #156)", async () => {
+describe("T-103 #162: update_todo description uploadMarkup + ops.description", () => {
+  it("description → uploadMarkup ref + ops.description (mirror update_issue)", async () => {
     const client = makeClient();
     client.findOne = vi.fn().mockResolvedValue({ _id: "t1", space: "sp1" });
     vi.mocked(getClient).mockResolvedValue(client as never);
@@ -438,17 +438,23 @@ describe("T-103 #106: update_todo description updateMarkup + fields", () => {
     );
 
     expect(result.isError).toBeUndefined();
-    // #106/#156: updateMarkup (updateContent rpc), KHÔNG uploadMarkup.
-    expect(client.updateMarkup).toHaveBeenCalledWith(
+    // #162: uploadMarkup (createContent rpc) creates new blob + swap ref via updateDoc.
+    // updateMarkup (updateContent) chỉ EDIT existing blob — fail khi todo chưa có desc.
+    expect(client.uploadMarkup).toHaveBeenCalledWith(
       "time:class:ToDo",
       "t1",
       "description",
       "new desc text",
       "markdown",
     );
-    expect(client.uploadMarkup).not.toHaveBeenCalled();
-    // description-only → KHÔNG updateDoc (markup updated in-place, no field ops).
-    expect(client.updateDoc).not.toHaveBeenCalled();
+    expect(client.updateMarkup).not.toHaveBeenCalled();
+    // description vào ops → updateDoc gọi (KHÔNG in-place markup-only).
+    const ops = client.updateDoc.mock.calls[0]?.[3] as { description?: unknown } | undefined;
+    expect(ops?.description).toEqual({
+      type: "blob",
+      blobId: "b1",
+    });
+    expect((result.details as { fields: string[] }).fields).toContain("description");
   });
 
   it("title + priority + visibility → updateDoc ops (non-markup fields)", async () => {
@@ -468,7 +474,7 @@ describe("T-103 #106: update_todo description updateMarkup + fields", () => {
     const call = client.updateDoc.mock.calls[0];
     expect(call?.[3]).toMatchObject({
       title: "Renamed",
-      priority: 0, // TODO_PRIORITY_MAP["high"]
+      priority: 3, // TODO_PRIORITY_MAP["high"] (#164: high=3, KHÔNG 0)
       visibility: "Private",
     });
   });

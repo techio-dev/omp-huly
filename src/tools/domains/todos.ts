@@ -15,16 +15,27 @@ import {
 import { findPersonByEmailOrName } from "./contacts.js";
 
 /**
- * ToDoPriority enum (audit §5 — @hcengineering/time).
- * High=0, Medium=1, Low=2, NoPriority=3, Urgent=4.
- * Pi-huly API dùng string ('urgent', 'high', ...) → map sang number cho server.
+ * ToDoPriority enum — Huly Priority (canonical, per @hcengineering/time).
+ * T-103 #164: 0=None, 1=Low, 2=Medium, 3=High, 4=Urgent (ASCENDING severity).
+ * Trước đây map INVERTED (high:0, no-priority:3) → 'high' lưu 0=None,
+ * 'no-priority' lưu 3=High (4/5 sai, chỉ urgent đúng). Pi-huly API dùng
+ * string ('urgent','high',...) → map sang number cho server.
  */
 const TODO_PRIORITY_MAP: Record<string, number> = {
-  high: 0,
-  medium: 1,
-  low: 2,
-  "no-priority": 3,
+  "no-priority": 0,
+  low: 1,
+  medium: 2,
+  high: 3,
   urgent: 4,
+};
+
+/** Reverse: numeric Huly priority → human label (cho get_todo render readable). */
+const TODO_PRIORITY_LABELS: Record<number, string> = {
+  0: "no-priority",
+  1: "low",
+  2: "medium",
+  3: "high",
+  4: "urgent",
 };
 
 /** Priority param schema (string → number enum mapping). */
@@ -87,6 +98,7 @@ export const tools: HulyToolDefinition[] = [
         user?: string;
         dueDate?: number | null;
         priority?: number;
+        description?: unknown;
       } | null;
       if (!t) {
         return {
@@ -95,17 +107,34 @@ export const tools: HulyToolDefinition[] = [
           details: { todo: params.todo },
         };
       }
+      // T-103 #163: fetch description markup (MarkupBlobRef → markdown).
+      let description: string | undefined;
+      if (t.description) {
+        try {
+          const markup = await tctx.client.fetchMarkup(
+            TODO_CLASS,
+            t._id,
+            "description",
+            t.description,
+            "markdown",
+          );
+          description = typeof markup === "string" ? markup : undefined;
+        } catch {
+          description = undefined;
+        }
+      }
       return {
         content: `Todo: ${t.title ?? ""}`,
         details: {
           _id: t._id,
           title: t.title,
+          description,
           // T-79 #102: Huly ToDo dùng doneOn (timestamp|null), KHÔNG `done` bool.
           doneOn: t.doneOn ?? null,
           done: t.doneOn != null,
           owner: t.user,
           dueDate: t.dueDate ?? null,
-          priority: t.priority,
+          priority: TODO_PRIORITY_LABELS[t.priority ?? -1] ?? t.priority,
         },
       };
     },
@@ -245,19 +274,19 @@ export const tools: HulyToolDefinition[] = [
           };
         ops.title = params.title;
       }
-      // T-103 #106: description = MarkupBlobRef. updateMarkup (updateContent rpc) —
-      // uploadMarkup/createMarkup (createContent) chỉ tạo INITIAL version, KHÔNG
-      // persist cho todo đã tồn tại (mirror #156 edit_document fix).
-      let descUpdated = false;
+      // T-103 #162: description = MarkupBlobRef → uploadMarkup ref + ops.description.
+      // Mirror update_issue (R11 proven persist). #106 trước dùng updateMarkup
+      // (updateContent) — chỉ EDIT blob existing, FAIL khi todo chưa có description
+      // (create without desc). uploadMarkup tạo blob mới + swap ref → works luôn.
       if (params.description !== undefined) {
-        await tctx.client.updateMarkup!(
+        const ref = await tctx.client.uploadMarkup(
           TODO_CLASS,
           t._id,
           "description",
           params.description,
           "markdown",
         );
-        descUpdated = true;
+        ops.description = ref;
       }
       // T-79G #106: owner → user: Ref<Employee> (resolve Person).
       if (params.owner !== undefined) {
@@ -284,7 +313,7 @@ export const tools: HulyToolDefinition[] = [
           ops.dueDate = params.dueDate;
         }
       }
-      if (Object.keys(ops).length === 0 && !descUpdated) {
+      if (Object.keys(ops).length === 0) {
         return { content: "No fields to update.", details: { updated: false } };
       }
       if (Object.keys(ops).length > 0) {
@@ -292,7 +321,6 @@ export const tools: HulyToolDefinition[] = [
         if (!updResult.ok) return updResult.error;
       }
       const fields = Object.keys(ops).filter((f) => f !== "$unset");
-      if (descUpdated) fields.push("description");
       if (ops.$unset !== undefined) fields.push("dueDate(clear)");
       return {
         content: `Updated todo ${params.todo}: ${fields.join(", ")}`,

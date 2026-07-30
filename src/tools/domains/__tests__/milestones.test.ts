@@ -41,6 +41,7 @@ function makeClient() {
     createDoc: vi.fn().mockResolvedValue("mile-id-1"),
     updateDoc: vi.fn().mockResolvedValue(undefined),
     removeDoc: vi.fn().mockResolvedValue(undefined),
+    uploadMarkup: vi.fn().mockResolvedValue({ blob: "ref" }),
   };
 }
 

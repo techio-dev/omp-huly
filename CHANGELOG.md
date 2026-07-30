@@ -3,6 +3,29 @@
 All notable changes to omp-huly sẽ document ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/),
 versioning theo [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] — 2026-07-30
+
+**Hotfix sync pi-huly `1.0.0-beta.17` (description persistence + todo priority map).**
+Port ngữ nghĩa 2 fix HIGH. Lưu ý: #160 **revert một phần beta.16** (update_todo description
+từ `updateMarkup` về `uploadMarkup` ref — updateMarkup chỉ edit blob existing, fail khi todo
+chưa có description). **689 tests pass** + 91 e2e-live skip, typecheck/lint/fmt green.
+
+### Fixed
+
+- **description persistence (component/milestone/todo)** (#160, HIGH): create/update component
+  + milestone push RAW STRING vào MarkupBlobRef description → garbage, get reads undefined.
+  Fix: pre-gen id → `uploadMarkup` ref (mirror create/update_issue). update_todo description
+  revert `updateMarkup`→`uploadMarkup` ref (R11 proven persist). get_todo +`fetchMarkup` render.
+- **TODO_PRIORITY_MAP inverted** (#161, HIGH): map `high:0, no-priority:3` (4/5 sai) → 'high'
+  lưu 0=None, 'no-priority' lưu 3=High. Fix canonical Huly Priority: 0=None, 1=Low, 2=Medium,
+  3=High, 4=Urgent (ascending severity) + reverse-label `TODO_PRIORITY_LABELS` render trong get_todo.
+
+### Tests
+
+- Port pi-huly beta.17 unit test changes (components/milestones/todos/t79g — uploadMarkup→ref
+  path + priority map assertions).
+- Port e2e-live-hunt8 (re-namespaced @earendil→@oh-my-pi).
+
 ## [0.2.0] — 2026-07-30
 
 **Sync upstream pi-huly `1.0.0-beta.15` → `1.0.0-beta.16` (markup persistence + input-validation hardening).**

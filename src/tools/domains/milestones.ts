@@ -194,13 +194,31 @@ export const tools: HulyToolDefinition[] = [
         };
       }
       // T-97 (#143): space = project._id (KHÔNG project.space — T-67 assumption sai).
-      const id = await tctx.client.createDoc(MILESTONE_CLASS, project._id as never, {
-        label: params.label,
-        description: params.description,
-        targetDate: params.targetDate,
-        // T-67 #75: MilestoneStatus.Planned = 0 (numeric enum, KHÔNG phải string).
-        status: 0,
-      });
+      // T-103 #162: description = MarkupBlobRef. Pre-gen id → uploadMarkup ref
+      // (mirror create_component/create_issue). Trước đây push raw string.
+      const msId = `${MILESTONE_CLASS as string}.${Math.random().toString(36).slice(2, 12)}`;
+      let descriptionRef: unknown = null;
+      if (params.description && params.description.trim() !== "") {
+        descriptionRef = await tctx.client.uploadMarkup(
+          MILESTONE_CLASS,
+          msId,
+          "description",
+          params.description,
+          "markdown",
+        );
+      }
+      const id = await tctx.client.createDoc(
+        MILESTONE_CLASS,
+        project._id as never,
+        {
+          label: params.label,
+          description: descriptionRef,
+          targetDate: params.targetDate,
+          // T-67 #75: MilestoneStatus.Planned = 0 (numeric enum, KHÔNG phải string).
+          status: 0,
+        },
+        msId as never,
+      );
       return {
         content: `Created milestone "${params.label}".`,
         details: { id, label: params.label },
@@ -261,7 +279,17 @@ export const tools: HulyToolDefinition[] = [
           };
         ops.label = params.label;
       }
-      if (params.description !== undefined) ops.description = params.description;
+      // T-103 #162: description = MarkupBlobRef → uploadMarkup ref (mirror update_component).
+      if (params.description !== undefined) {
+        const ref = await tctx.client.uploadMarkup(
+          MILESTONE_CLASS,
+          m._id,
+          "description",
+          params.description,
+          "markdown",
+        );
+        ops.description = ref;
+      }
       if (params.targetDate !== undefined) ops.targetDate = params.targetDate;
       if (params.status !== undefined) {
         try {
