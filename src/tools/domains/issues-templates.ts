@@ -9,6 +9,8 @@ import {
   PROJECT_CLASS,
   PERSON_CLASS,
   COMPONENT_CLASS,
+  NO_PARENT_REF,
+  ISSUE_KIND_REF,
 } from "./_class-refs.js";
 import type { IssueTemplateDoc, PersonDoc, ComponentDoc } from "./_entity-types.js";
 import {
@@ -168,6 +170,14 @@ export const tools: HulyToolDefinition[] = [
       description: z.optional(z.string()),
     }),
     async handler(params, tctx) {
+      // T-103 #160: guard title non-empty.
+      if (params.title.trim() === "") {
+        return {
+          content: `create_template title must be non-empty.`,
+          isError: true,
+          details: { title: params.title },
+        };
+      }
       const project = await tctx.client.findOne(PROJECT_CLASS, {
         identifier: tctx.project,
       });
@@ -250,21 +260,55 @@ export const tools: HulyToolDefinition[] = [
         component?: string | null;
         description?: string;
       };
-      // T-97 (#143): space = project._id (đồng bộ create_issue issues-core).
-      const id = await tctx.client.createDoc(
-        ISSUE_CLASS,
+      // T-103 #155: Issue = AttachedDoc → createDoc crash ('cannot be used for objects
+      // inherited from AttachedDoc'). Mirror create_issue: $inc sequence → identifier
+      // → addCollection (attached-to-project collection), KHÔNG createDoc.
+      const incResult = await tctx.client.updateDoc(
+        PROJECT_CLASS,
+        "core:space:Space" as never,
         project._id as never,
+        { $inc: { sequence: 1 } } as never,
+        true,
+      );
+      const seqRaw = (incResult as { object?: { sequence?: number } })?.object?.sequence;
+      const sequence =
+        typeof seqRaw === "number"
+          ? seqRaw
+          : ((project as { sequence?: number }).sequence ?? 0) + 1;
+      const identifier = `${(project as { identifier?: string }).identifier ?? tctx.project}-${sequence}`;
+      // description: copy markup ref từ template (nếu có), KHÔNG re-upload.
+      const issueId = `tracker:issue.${Math.random().toString(36).slice(2, 14)}`;
+      const id = await tctx.client.addCollection(
+        ISSUE_CLASS,
+        project._id as never, // space = project (issues live trong project space)
+        NO_PARENT_REF, // attachedTo = NoParent sentinel (top-level)
+        ISSUE_CLASS, // attachedToClass
+        "subIssues", // collection
         {
           title,
-          description: tplFields.description,
+          description: tplFields.description ?? null,
           priority: tplFields.priority ?? "no-priority",
           assignee: tplFields.assignee ?? null,
           component: tplFields.component ?? null,
+          status: undefined,
+          number: sequence,
+          kind: ISSUE_KIND_REF,
+          identifier,
+          estimation: 0,
+          remainingTime: 0,
+          reportedTime: 0,
+          reports: 0,
+          subIssues: 0,
+          parents: [],
+          childInfo: [],
+          dueDate: null,
+          rank: "",
         } as never,
+        issueId as never,
       );
       return {
-        content: `Created issue "${title}" from template.`,
-        details: { id, title, template: params.template },
+        content: `Created issue ${identifier}: "${title}" from template.`,
+        details: { id, identifier, title, template: params.template },
       };
     },
   }),
@@ -304,7 +348,15 @@ export const tools: HulyToolDefinition[] = [
         };
       }
       const ops: Record<string, unknown> = {};
-      if (params.title !== undefined) ops.title = params.title;
+      if (params.title !== undefined) {
+        if (params.title.trim() === "")
+          return {
+            content: "title must be non-empty.",
+            isError: true,
+            details: { title: params.title },
+          };
+        ops.title = params.title;
+      }
       if (params.description !== undefined)
         ops.description = JSON.stringify(mdToMarkup(params.description));
       if (Object.keys(ops).length === 0) {

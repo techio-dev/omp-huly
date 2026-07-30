@@ -231,3 +231,19 @@ describe("T-72: update_milestone status enum conversion", () => {
     expect(client.updateDoc).not.toHaveBeenCalled();
   });
 });
+
+describe("T-103 #160: create_milestone label guard (non-empty)", () => {
+  it("empty label → isError, createDoc KHÔNG gọi", async () => {
+    const client = makeClient();
+    vi.mocked(getClient).mockResolvedValue(client as never);
+    const r = await findTool("huly_create_milestone").execute(
+      "t1",
+      { label: "", targetDate: Date.now() + 86400000 },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(r.isError).toBe(true);
+    expect(client.createDoc).not.toHaveBeenCalled();
+  });
+});

@@ -217,6 +217,16 @@ class MockHulyStore {
   ): Promise<{ blob: string }> {
     return { blob: `blob-${_id.slice(0, 8)}` };
   }
+  // T-103 #156: updateMarkup mock (edit existing doc content).
+  async updateMarkup(
+    _c: string,
+    _id: string,
+    _attr: string,
+    _markup: string,
+    _format: string,
+  ): Promise<void> {
+    // no-op (smoke test — content persistence verified live e2e).
+  }
 
   /** Seed helper — inject doc directly (bypass createDoc cho test setup). */
   seed(_class: string, doc: Record<string, unknown>): string {

@@ -43,8 +43,10 @@ function makeClient() {
     findAll: vi.fn().mockResolvedValue([]),
     findOne: vi.fn(),
     createDoc: vi.fn().mockResolvedValue("tpl-id-1"),
-    updateDoc: vi.fn().mockResolvedValue(undefined),
+    addCollection: vi.fn().mockResolvedValue("issue-id-1"),
+    updateDoc: vi.fn().mockResolvedValue({ object: { sequence: 42 } }),
     removeDoc: vi.fn().mockResolvedValue(undefined),
+    uploadMarkup: vi.fn().mockResolvedValue("desc-ref"),
     fetchMarkup: vi.fn().mockResolvedValue("# template desc"),
   };
 }
@@ -123,22 +125,29 @@ describe("T-51 #41: create_issue_from_template (2 lookup paths)", () => {
     expect(client.createDoc).not.toHaveBeenCalled();
   });
 
-  it("happy path (cả 2 tồn tại) → createDoc dùng project._id", async () => {
+  it("happy path (cả 2 tồn tại) → addCollection (KHÔNG createDoc — T-103 #155 Issue=AttachedDoc) + identifier", async () => {
     const client = makeClient();
     client.findOne = vi
       .fn()
       .mockResolvedValueOnce({ _id: "proj-1", identifier: "PD", space: "happy-space" }) // project (T-100 project-first)
-      .mockResolvedValueOnce({ _id: "tpl-123", title: "Bug", description: "{}" }); // template
+      .mockResolvedValueOnce({ _id: "tpl-123", title: "Bug", description: "{}", priority: "low" }); // template
     vi.mocked(getClient).mockResolvedValue(client as never);
 
     const tool = findTool("huly_create_issue_from_template");
     const result = await tool.execute("tc1", { template: "tpl-123" }, undefined, undefined, ctx);
 
     expect(result.isError).toBeUndefined();
-    const call = client.createDoc.mock.calls[0];
-    // T-97 (#143): space = project._id ("proj-1"), KHÔNG project.space.
-    expect(call?.[1]).toBe("proj-1");
-    expect(call?.[1]).not.toBe("ws1");
+    // #155: Issue = AttachedDoc → phải addCollection, KHÔNG createDoc.
+    expect(client.addCollection).toHaveBeenCalledTimes(1);
+    expect(client.createDoc).not.toHaveBeenCalled();
+    // space = project._id (T-97 #143).
+    expect(client.addCollection.mock.calls[0]?.[1]).toBe("proj-1");
+    // identifier computed từ sequence (PD-42).
+    expect(result.details).toMatchObject({
+      identifier: "PD-42",
+      title: "Bug",
+      template: "tpl-123",
+    });
   });
 });
 
@@ -288,7 +297,7 @@ describe("T-76: create_template default fields", () => {
 });
 
 describe("T-76: create_issue_from_template copies priority/assignee/component", () => {
-  it("create_from → createDoc copies template fields (KHÔNG chỉ title+description)", async () => {
+  it("create_from → addCollection copies template fields (T-103 #155: Issue=AttachedDoc)", async () => {
     const client = makeClient();
     client.findOne = vi
       .fn()
@@ -306,7 +315,8 @@ describe("T-76: create_issue_from_template copies priority/assignee/component", 
     const tool = tools.find((t) => t.name === "huly_create_issue_from_template")!;
     await tool.execute("tc1", { template: "tpl-1" }, undefined, undefined, ctx);
 
-    const attrs = client.createDoc.mock.calls[0]?.[2] as Record<string, unknown>;
+    // #155: addCollection doc = call[5] (class, space, attachedTo, attachedToClass, collection, doc).
+    const attrs = client.addCollection.mock.calls[0]?.[5] as Record<string, unknown>;
     expect(attrs.priority).toBe("high"); // copied from template
     expect(attrs.assignee).toBe("person-1");
     expect(attrs.component).toBe("comp-1");
@@ -384,5 +394,21 @@ describe("T-89: list/get_templates sort + output fields (#124)", () => {
       createdOn: 1000,
     });
     expect(Array.isArray(details.children)).toBe(true);
+  });
+});
+
+describe("T-103 #160: create_template title guard (non-empty)", () => {
+  it("empty title → isError, createDoc KHÔNG gọi", async () => {
+    const client = makeClient();
+    vi.mocked(getClient).mockResolvedValue(client as never);
+    const r = await findTool("huly_create_template").execute(
+      "t1",
+      { title: "" },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(r.isError).toBe(true);
+    expect(client.createDoc).not.toHaveBeenCalled();
   });
 });

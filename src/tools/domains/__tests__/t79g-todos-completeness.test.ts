@@ -42,6 +42,7 @@ function makeClient() {
     updateDoc: vi.fn().mockResolvedValue(undefined),
     removeDoc: vi.fn().mockResolvedValue(undefined),
     uploadMarkup: vi.fn().mockResolvedValue({ blob: "ref-new" }),
+    updateMarkup: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -93,7 +94,7 @@ describe("T-79G: update_todo owner/priority/visibility (#106)", () => {
 });
 
 describe("T-79G: update_todo description markup (#106)", () => {
-  it("description + existing ref → uploadMarkup + updateDoc (KHÔNG updateMarkup)", async () => {
+  it("description → updateMarkup (T-103 #156: updateContent rpc, KHÔNG uploadMarkup)", async () => {
     const client = makeClient();
     client.findOne = vi.fn().mockResolvedValueOnce({
       _id: "t1",
@@ -111,21 +112,22 @@ describe("T-79G: update_todo description markup (#106)", () => {
       ctx,
     );
 
-    // Library KHÔNG có updateMarkup → luôn uploadMarkup + updateDoc.
-    expect(client.uploadMarkup).toHaveBeenCalledWith(
+    // #156: updateMarkup (updateContent rpc), KHÔNG uploadMarkup/createMarkup.
+    expect(client.updateMarkup).toHaveBeenCalledWith(
       "time:class:ToDo",
       "t1",
       "description",
       "new text",
       "markdown",
     );
-    const ops = client.updateDoc.mock.calls[0]?.[3] as Record<string, unknown>;
-    expect(ops.description).toEqual({ blob: "ref-new" });
+    expect(client.uploadMarkup).not.toHaveBeenCalled();
+    // description-only → KHÔNG updateDoc (markup updated in-place).
+    expect(client.updateDoc).not.toHaveBeenCalled();
     expect(result.details).toMatchObject({ updated: true });
     expect((result.details as { fields: string[] }).fields).toContain("description");
   });
 
-  it("description + no existing ref → uploadMarkup create → ops.description = ref", async () => {
+  it("description (no existing ref) → updateMarkup creates version in-place", async () => {
     const client = makeClient();
     client.findOne = vi.fn().mockResolvedValueOnce({ _id: "t1", space: "sp1" }); // no description
     vi.mocked(getClient).mockResolvedValue(client as never);
@@ -133,14 +135,14 @@ describe("T-79G: update_todo description markup (#106)", () => {
     const tool = findTool("huly_update_todo");
     await tool.execute("tc1", { todo: "t1", description: "first text" }, undefined, undefined, ctx);
 
-    expect(client.uploadMarkup).toHaveBeenCalledWith(
+    expect(client.updateMarkup).toHaveBeenCalledWith(
       "time:class:ToDo",
       "t1",
       "description",
       "first text",
       "markdown",
     );
-    expect(client.updateDoc.mock.calls[0]?.[3]).toMatchObject({ description: { blob: "ref-new" } });
+    expect(client.uploadMarkup).not.toHaveBeenCalled();
   });
 });
 

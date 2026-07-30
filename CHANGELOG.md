@@ -3,6 +3,45 @@
 All notable changes to omp-huly sẽ document ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/),
 versioning theo [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-07-30
+
+**Sync upstream pi-huly `1.0.0-beta.15` → `1.0.0-beta.16` (markup persistence + input-validation hardening).**
+Port ngữ nghĩa 9 fix (adapt sang Zod + namespace @oh-my-pi, KHÔNG merge thô — omp đã
+typebox→Zod). Builder cast `as z.infer` KHÔNG parse runtime → guard imperative (parity
+pi-huly). **689 tests pass** + 78 e2e-live skip (gated), typecheck/lint/fmt green.
+
+### Added
+
+- `HulyClient.updateMarkup` (optional) — WS impl (collaborator.updateMarkup / updateContent
+  rpc) + REST throwing stub. Edit existing document/todo content in-place.
+
+### Fixed
+
+- **create_issue_from_template crash (AttachedDoc)** (#155, HIGH): `createDoc(ISSUE_CLASS)`
+  crash 'cannot be used for objects inherited from AttachedDoc'. Mirror `create_issue`:
+  `$inc` sequence → identifier → `addCollection` ('subIssues' collection) + full field set.
+- **edit_document silent no-persist** (#156, HIGH): `saveContent` uploadMarkup (createContent)
+  chỉ tạo INITIAL version, KHÔNG persist → dùng `updateMarkup` (updateContent rpc).
+- **update_todo description no-persist** (#106): description via `updateMarkup` in-place
+  (mirror #156); `descUpdated` flag, conditional `safeUpdateDoc`.
+- **update_user_profile wrong Person** (#157): lookup-by-_id fail (Person._id ≠ uuid) →
+  `personUuid` field (canonical account→Person link). + `accountToUser` extract real email
+  từ `fullSocialIds[email]` (primarySocialId có thể là numeric id, KHÔNG email).
+- **log_time non-positive** (#158, MED): value 0/negative accepted → time corruption.
+  Handler guard `value > 0`.
+- **create_issue empty title** (#159): whitespace title = garbage issue. Guard `trim()`.
+- **create tools empty title/label — SYSTEMIC** (#160): create_todo / create_milestone /
+  create_component / create_tag / create_template cùng bug class. Uniform empty-guard.
+- **update tools empty title/label — SYSTEMIC** (#161): update_issue / update_component /
+  update_milestone / update_todo / update_template / update_tag rename → ''. Uniform guard.
+
+### Tests
+
+- Port pi-huly unit guard tests (components / issues-core / milestones / tags / time /
+  todos / issues-templates / workspace) + assertion updates (uploadMarkup→updateMarkup,
+  createDoc→addCollection, _id→personUuid).
+- Port e2e-live-edge/edge3/edge4/hunt5/hunt6/hunt7/verify (re-namespaced @earendil→@oh-my-pi).
+
 ## [0.1.0] — 2026-07-30
 
 - Fork from pi-huly `1.0.0-beta.14` (includes #153 `list_issues` filter fix); retarget to oh-my-pi (omp).

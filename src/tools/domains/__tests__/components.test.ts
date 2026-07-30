@@ -148,3 +148,19 @@ describe("T-52 #42: set_issue_component FK validate", () => {
     expect(ops.component).toBe("comp-1");
   });
 });
+
+describe("T-103 #160: create_component label guard (non-empty)", () => {
+  it("empty label → isError, createDoc KHÔNG gọi", async () => {
+    const client = makeClient();
+    vi.mocked(getClient).mockResolvedValue(client as never);
+    const r = await findTool("huly_create_component").execute(
+      "t1",
+      { label: "" },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(r.isError).toBe(true);
+    expect(client.createDoc).not.toHaveBeenCalled();
+  });
+});
