@@ -15,7 +15,7 @@
 // testable KHÔNG cần mock toàn bộ ExtensionCommandContext. Output qua
 // ctx.ui.notify (TUI) + return string (non-TUI / log).
 
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
 import {
   addWorkspace,
   findByName,

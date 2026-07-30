@@ -5,7 +5,7 @@
 // chia 3 files + Documents tách snapshots = 21 files) + registerTool each.
 // Total: 102 tools (FR-02).
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import type { HulyToolDefinition } from "./builder.js";
 
 // Import 19 domain modules

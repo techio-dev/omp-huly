@@ -12,7 +12,7 @@
 //
 // Domain module chỉ khai báo opts (schema + handler thuần), builder lo phần binding.
 
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import type { Static, TObject } from "typebox";
 import { getClient } from "../client/pool.js";
 import { mapError, sanitize } from "../client/errors.js";

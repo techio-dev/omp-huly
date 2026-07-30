@@ -11,8 +11,8 @@
 //   <content preview, 12 dòng đầu>
 //   modified: 2026-01-01 (dim)
 
-import type { Component } from "@earendil-works/pi-tui";
-import type { AgentToolResult, ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
+import type { Component } from "@oh-my-pi/pi-tui";
+import type { AgentToolResult, ToolRenderResultOptions } from "@oh-my-pi/pi-coding-agent";
 import {
   fmtDate,
   getOrCreateText,
@@ -73,6 +73,8 @@ export function renderDocumentResult(
   context: RenderContext,
 ): Component {
   const text = getOrCreateText(context);
-  text.setText(formatDocumentPreview(result.details, theme));
+  if (result.details !== undefined) {
+    text.setText(formatDocumentPreview(result.details, theme));
+  }
   return text;
 }

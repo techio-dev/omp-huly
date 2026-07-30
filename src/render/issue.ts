@@ -8,8 +8,8 @@
 // Pure function testable KHÔNG cần pi types (chỉ cần theme stub có fg/bg/bold).
 // Shared helpers + RenderTheme/RenderContext ở render/util.ts.
 
-import type { Component } from "@earendil-works/pi-tui";
-import type { AgentToolResult, ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
+import type { Component } from "@oh-my-pi/pi-tui";
+import type { AgentToolResult, ToolRenderResultOptions } from "@oh-my-pi/pi-coding-agent";
 import {
   fmtDate,
   getOrCreateText,
@@ -155,7 +155,9 @@ export function renderIssueResult(
   context: RenderContext,
 ): Component {
   const text = getOrCreateText(context);
-  text.setText(formatIssueCard(result.details, theme));
+  if (result.details !== undefined) {
+    text.setText(formatIssueCard(result.details, theme));
+  }
   return text;
 }
 
@@ -170,6 +172,8 @@ export function renderIssueListResult(
   context: RenderContext,
 ): Component {
   const text = getOrCreateText(context);
-  text.setText(formatIssueList(result.details, theme));
+  if (result.details !== undefined) {
+    text.setText(formatIssueList(result.details, theme));
+  }
   return text;
 }

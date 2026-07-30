@@ -24,7 +24,7 @@
 // T-91 correctness round-trip local.
 
 import { describe, expect, it } from "vitest";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { tools as issueCoreTools } from "../tools/domains/issues-core.js";
 import { tools as tagTools } from "../tools/domains/tags.js";
 import { tools as tagCategoryTools } from "../tools/domains/tag-categories.js";

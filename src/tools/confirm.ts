@@ -7,7 +7,7 @@
 //
 // Confirm KHÔNG bypass: non-TUI mode deny mọi destructive op (NFR-10 safety).
 
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 
 /** Detail object cho confirm prompt. */
 export interface ConfirmContext {
