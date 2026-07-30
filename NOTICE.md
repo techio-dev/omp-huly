@@ -1,17 +1,20 @@
-# NOTICE — pi-huly license attribution
+# NOTICE — omp-huly license attribution
 
 > R1 license audit (T-37). Verified 2026-07-27 qua npm package.json metadata.
 > Technical analysis, KHÔNG phải legal advice. Maintainer final review.
 
-## pi-huly (MIT)
+## omp-huly (MIT)
 
-- **License**: [MIT](./LICENSE) © 2026 naicoi92
-- **Source**: <https://github.com/naicoi92/pi-huly>
+- **License**: [MIT](./LICENSE) © 2026 can1357
+- **Source**: <https://github.com/techio-dev/omp-huly>
+- **Lineage**: Fork of [pi-huly](https://github.com/naicoi92/pi-huly) (MIT © naicoi92)
+  which targets [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) (Pi by Mario).
+  omp-huly retargets pi-huly to [oh-my-pi](https://github.com/techio-dev/oh-my-pi) (omp), can1357's Pi fork.
 
 ## Runtime dependencies (EPL-2.0, npm public)
 
-pi-huly declare `@hcengineering/*` là `dependencies` trong `package.json`.
-Consumer `pi install npm:pi-huly` → npm auto-install `@hcengineering/*` từ
+omp-huly declare `@hcengineering/*` là `dependencies` trong `package.json`.
+Consumer `omp install npm:omp-huly` → npm auto-install `@hcengineering/*` từ
 npmjs.org (publishConfig access public, verified T-37) → KHÔNG cần GitHub
 Packages token (NFR-06). `dist/index.mjs` KHÔNG bundle @hcengineering — code
 `import` từ `node_modules/@hcengineering/*` runtime (rolldown external).
@@ -28,16 +31,16 @@ Packages token (NFR-06). `dist/index.mjs` KHÔNG bundle @hcengineering — code
 
 1. **Attribution** (§3.6): this NOTICE discloses EPL-2.0 dependencies.
 2. **Source availability** (§3.6): consumer install `@hcengineering/*` từ npm
-   (public, source included trong tarball npm). pi-huly KHÔNG vendor source.
+   (public, source included trong tarball npm). omp-huly KHÔNG vendor source.
 3. **No additional restrictions** (§7): EPL-2.0 permit commercial use,
-   modification, distribution với attribution + source availability.
+  modification, distribution với attribution + source availability.
 
 ### MIT compat EPL-2.0
 
-- pi-huly (MIT) depends on @hcengineering (EPL-2.0) runtime. Dist bundle chỉ
-  chứa code pi-huly (MIT). @hcengineering code ở node_modules riêng.
-- EPL-2.0 copyleft KHÔNG lan sang pi-huly source (separate distribution).
-- `LICENSE` (MIT) áp dụng cho pi-huly. `@hcengineering/*` subject EPL-2.0
+- omp-huly (MIT) depends on @hcengineering (EPL-2.0) runtime. Dist bundle chỉ
+  chứa code omp-huly (MIT). @hcengineering code ở node_modules riêng.
+- EPL-2.0 copyleft KHÔNG lan sang omp-huly source (separate distribution).
+- `LICENSE` (MIT) áp dụng cho omp-huly. `@hcengineering/*` subject EPL-2.0
   riêng (npm package license field).
 
 ### EPL-2.0 full text
@@ -49,11 +52,10 @@ Packages token (NFR-06). `dist/index.mjs` KHÔNG bundle @hcengineering — code
 | Package | License |
 |---|---|
 | `ws` | MIT (<https://www.npmjs.com/package/ws>) |
-| `typebox` | MIT (<https://www.npmjs.com/package/typebox>) |
-| `@earendil-works/pi-coding-agent` | MIT (<https://www.npmjs.com/package/@earendil-works/pi-coding-agent>) |
-| `@earendil-works/pi-agent-core` | MIT |
-| `@earendil-works/pi-ai` | MIT |
-| `@earendil-works/pi-tui` | MIT |
+| `zod` | MIT (<https://www.npmjs.com/package/zod>) |
+| `@oh-my-pi/pi-coding-agent` | MIT (<https://github.com/techio-dev/oh-my-pi>) |
+| `@oh-my-pi/pi-agent-core` | MIT |
+| `@oh-my-pi/pi-tui` | MIT |
 
 DevDependencies (oxlint, oxfmt, rolldown, vitest, typescript, markdownlint-cli2,
 @vitest/coverage-v8) đều MIT. KHÔNG ship trong tarball.
@@ -66,6 +68,6 @@ responsibility: final legal review trước publish.
 
 ## Reference
 
-- Design `03-tech-stack.md` §4 (R1 risk assessment)
-- Design `08-non-functional.md` §A (Dependency CVE + license)
-- Design `10-release.md` §A (Pre-Release Audit R1)
+- Upstream pi-huly design `03-tech-stack.md` §4 (R1 risk assessment)
+- Upstream pi-huly design `08-non-functional.md` §A (Dependency CVE + license)
+- Upstream pi-huly design `10-release.md` §A (Pre-Release Audit R1)
