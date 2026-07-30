@@ -54,9 +54,6 @@ importers:
       rolldown:
         specifier: ^1.2.0
         version: 1.2.0
-      typebox:
-        specifier: ^1.3.8
-        version: 1.3.8
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -2820,9 +2817,6 @@ packages:
   type-fest@0.13.1:
     resolution: {integrity: sha512-34R7HTnG0XIJcBSn5XhDd7nNFPRcXYRZrBB2O2jdKqYODldSzBAqzsWoZYYvduky73toYS/ESqxPvkDf/F0XMg==}
     engines: {node: '>=10'}
-
-  typebox@1.3.8:
-    resolution: {integrity: sha512-xYaJgF0KMvBViKWRaKTAtfR6sDt/yH6xAjGAHXYJxKxUF4pVyPXZZhIlwOg6cDIE81N7L0pyIHs136RHBm6rLQ==}
 
   typed-query-selector@2.12.2:
     resolution: {integrity: sha512-EOPFbyIub4ngnEdqi2yOcNeDLaX/0jcE1JoAXQDDMIthap7FoN795lc/SHfIq2d416VufXpM8z/lD+WRm2gfOQ==}
@@ -5812,8 +5806,6 @@ snapshots:
 
   type-fest@0.13.1:
     optional: true
-
-  typebox@1.3.8: {}
 
   typed-query-selector@2.12.2: {}
 

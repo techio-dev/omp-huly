@@ -5,7 +5,7 @@
 // reality-checker CONFIRMED vs @hcengineering/tags types. TagElement dùng title,
 // TagCategory dùng label — KHÔNG nhầm.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { TAG_CATEGORY_CLASS, WORKSPACE_SPACE } from "./_class-refs.js";
 import { workspaceParam, safeUpdateDoc, safeRemoveDoc } from "./_common.js";
@@ -16,7 +16,7 @@ export const tools: HulyToolDefinition[] = [
     name: "list_tag_categories",
     label: "List tag categories",
     description: "List tag categories.",
-    parameters: Type.Object({ workspace: workspaceParam }),
+    parameters: z.object({ workspace: workspaceParam }),
     async handler(_params, tctx) {
       const cats = await tctx.client.findAll(TAG_CATEGORY_CLASS, {}, {});
       const list = cats.map((c) => ({
@@ -36,10 +36,10 @@ export const tools: HulyToolDefinition[] = [
     name: "create_tag_category",
     label: "Create tag category",
     description: "Create tag category.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      label: Type.String(),
-      targetClass: Type.Optional(Type.String()),
+      label: z.string(),
+      targetClass: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       const id = await tctx.client.createDoc(TAG_CATEGORY_CLASS, WORKSPACE_SPACE, {
@@ -62,11 +62,11 @@ export const tools: HulyToolDefinition[] = [
     name: "update_tag_category",
     label: "Update tag category",
     description: "Update tag category (label, targetClass).",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      category: Type.String(),
-      label: Type.Optional(Type.String()),
-      targetClass: Type.Optional(Type.String()),
+      category: z.string(),
+      label: z.optional(z.string()),
+      targetClass: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       const c = await tctx.client.findOne(TAG_CATEGORY_CLASS, { _id: params.category });
@@ -102,9 +102,9 @@ export const tools: HulyToolDefinition[] = [
       type: "tag category",
       id: (p as { category?: string }).category ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      category: Type.String(),
+      category: z.string(),
     }),
     async handler(params, tctx) {
       const c = await tctx.client.findOne(TAG_CATEGORY_CLASS, { _id: params.category });

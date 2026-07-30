@@ -8,7 +8,7 @@
 //
 // Comment = chunter:class:ChatMessage attached to issue (collection "comments").
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { CHAT_MESSAGE_CLASS, ISSUE_CLASS } from "./_class-refs.js";
 import {
@@ -44,7 +44,7 @@ export const tools: HulyToolDefinition[] = [
     label: "List comments",
     description: "List comments trên issue.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
@@ -91,11 +91,11 @@ export const tools: HulyToolDefinition[] = [
     needsProject: true,
     needsAssignee: true,
     assigneeField: "author",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      body: Type.String({ description: "Comment body (markdown)." }),
+      body: z.string().describe("Comment body (markdown)."),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {
@@ -128,10 +128,10 @@ export const tools: HulyToolDefinition[] = [
     name: "update_comment",
     label: "Update comment",
     description: "Update comment body (→ message field + editedOn).",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      comment: Type.String(),
-      body: Type.String(),
+      comment: z.string(),
+      body: z.string(),
     }),
     async handler(params, tctx) {
       const c = await tctx.client.findOne(CHAT_MESSAGE_CLASS, { _id: params.comment });
@@ -164,9 +164,9 @@ export const tools: HulyToolDefinition[] = [
       type: "comment",
       id: (p as { comment?: string }).comment ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      comment: Type.String(),
+      comment: z.string(),
     }),
     async handler(params, tctx) {
       const c = await tctx.client.findOne(CHAT_MESSAGE_CLASS, { _id: params.comment });

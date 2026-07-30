@@ -25,7 +25,7 @@
 //   1. add_issue_relation     2. remove_issue_relation  3. list_issue_relations
 //   4. link_document_to_issue 5. unlink_document_to_issue
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { ISSUE_CLASS } from "./_class-refs.js";
 import {
@@ -57,16 +57,12 @@ export const tools: HulyToolDefinition[] = [
       "Storage (T-61, khớp Huly UI): blocks→target.blockedBy, is-blocked-by→source.blockedBy, " +
       "relates-to→bidirectional (cả 2 issue.relations).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      targetIssue: Type.String({ description: "Target issue identifier." }),
-      relationType: Type.Union([
-        Type.Literal("blocks"),
-        Type.Literal("is-blocked-by"),
-        Type.Literal("relates-to"),
-      ]),
+      targetIssue: z.string().describe("Target issue identifier."),
+      relationType: z.enum(["blocks", "is-blocked-by", "relates-to"]),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {
@@ -188,16 +184,12 @@ export const tools: HulyToolDefinition[] = [
       type: "issue relation",
       id: (p as { identifier?: string }).identifier ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      targetIssue: Type.String({ description: "Target issue identifier to remove relation to." }),
-      relationType: Type.Union([
-        Type.Literal("blocks"),
-        Type.Literal("is-blocked-by"),
-        Type.Literal("relates-to"),
-      ]),
+      targetIssue: z.string().describe("Target issue identifier to remove relation to."),
+      relationType: z.enum(["blocks", "is-blocked-by", "relates-to"]),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {
@@ -301,7 +293,7 @@ export const tools: HulyToolDefinition[] = [
       "is-blocked-by: đọc issue.blockedBy trực tiếp. " +
       "relates-to: đọc issue.relations (bidirectional).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
@@ -386,11 +378,11 @@ export const tools: HulyToolDefinition[] = [
     description:
       "UNAVAILABLE — tracker:class:Document not registered runtime. Link doc↔issue via Huly UI.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      document: Type.String(),
+      document: z.string(),
     }),
     async handler(_params, _tctx) {
       return {
@@ -412,11 +404,11 @@ export const tools: HulyToolDefinition[] = [
     description:
       "UNAVAILABLE — tracker:class:Document not registered runtime. Unlink doc↔issue via Huly UI.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      document: Type.String(),
+      document: z.string(),
     }),
     async handler(_params, _tctx) {
       return {

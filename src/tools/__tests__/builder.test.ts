@@ -2,7 +2,7 @@
 // confirm gate, assignee default, handler convert.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Type } from "typebox";
+import { z } from "zod";
 
 // Mock dependencies BEFORE import builder.ts
 vi.mock("../../client/pool.js", () => ({ getClient: vi.fn() }));
@@ -96,7 +96,7 @@ describe("defineHulyTool — prefix huly_ (D5 FR-02)", () => {
       name: "list_issues",
       label: "List issues",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({ content: "ok" }),
     });
     expect(tool.name).toBe("huly_list_issues");
@@ -109,7 +109,7 @@ describe("defineHulyTool execute — resolve + getClient + handler", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({ workspace: Type.Optional(Type.String()) }),
+      parameters: z.object({ workspace: z.optional(z.string()) }),
       handler: async (_params, tctx) => ({
         content: `ws=${tctx.workspace} project=${tctx.project ?? "n/a"}`,
       }),
@@ -130,7 +130,7 @@ describe("defineHulyTool execute — resolve + getClient + handler", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({ project: Type.Optional(Type.String()) }),
+      parameters: z.object({ project: z.optional(z.string()) }),
       needsProject: true,
       handler: async (_params, tctx) => ({ content: `project=${tctx.project}` }),
     });
@@ -147,7 +147,7 @@ describe("defineHulyTool execute — error mapping (FR-14)", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({ content: "ok" }),
     });
     const result = await tool.execute("tc1", {}, undefined, undefined, makeCtx());
@@ -161,7 +161,7 @@ describe("defineHulyTool execute — error mapping (FR-14)", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => {
         throw new Error("network down");
       },
@@ -177,7 +177,7 @@ describe("defineHulyTool execute — error mapping (FR-14)", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => {
         throw new Error("token=abc123secret456 network down");
       },
@@ -195,7 +195,7 @@ describe("defineHulyTool execute — confirm gate (FR-09 D9)", () => {
       name: "delete_issue",
       label: "Delete",
       description: "delete",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       destructive: true,
       handler,
     });
@@ -211,7 +211,7 @@ describe("defineHulyTool execute — confirm gate (FR-09 D9)", () => {
       name: "delete_issue",
       label: "Delete",
       description: "delete",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       destructive: true,
       destructiveContext: () => ({ type: "issue", id: "PD-1" }),
       handler,
@@ -229,7 +229,7 @@ describe("defineHulyTool execute — confirm gate (FR-09 D9)", () => {
       name: "delete_issue",
       label: "Delete",
       description: "delete",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       destructive: true,
       handler,
     });
@@ -247,9 +247,9 @@ describe("defineHulyTool execute — assignee default (D15 FR-18)", () => {
       name: "create_issue",
       label: "Create",
       description: "create",
-      parameters: Type.Object({
-        title: Type.String(),
-        assignee: Type.Optional(Type.String()),
+      parameters: z.object({
+        title: z.string(),
+        assignee: z.optional(z.string()),
       }),
       needsAssignee: true,
       handler,
@@ -267,9 +267,9 @@ describe("defineHulyTool execute — assignee default (D15 FR-18)", () => {
       name: "create_issue",
       label: "Create",
       description: "create",
-      parameters: Type.Object({
-        title: Type.String(),
-        assignee: Type.Optional(Type.String()),
+      parameters: z.object({
+        title: z.string(),
+        assignee: z.optional(z.string()),
       }),
       needsAssignee: true,
       handler,
@@ -287,8 +287,8 @@ describe("defineHulyTool execute — assignee default (D15 FR-18)", () => {
       name: "log_time",
       label: "Log",
       description: "log",
-      parameters: Type.Object({
-        owner: Type.Optional(Type.String()),
+      parameters: z.object({
+        owner: z.optional(z.string()),
       }),
       needsAssignee: true,
       assigneeField: "owner",
@@ -315,7 +315,7 @@ describe("defineHulyTool execute — error gate coverage (FR-14)", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({ content: "ok" }),
     });
     const result = await tool.execute("tc1", {}, undefined, undefined, makeCtx());
@@ -335,7 +335,7 @@ describe("defineHulyTool execute — error gate coverage (FR-14)", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({ content: "ok" }),
     });
     const result = await tool.execute("tc1", {}, undefined, undefined, makeCtx());
@@ -351,7 +351,7 @@ describe("defineHulyTool execute — error gate coverage (FR-14)", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({ content: "ok" }),
     });
     const result = await tool.execute("tc1", {}, undefined, undefined, makeCtx());
@@ -364,7 +364,7 @@ describe("defineHulyTool execute — error gate coverage (FR-14)", () => {
       name: "get_issue",
       label: "Get",
       description: "get",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "Issue desc: Authorization=Bearer-abc123secret456 here",
       }),
@@ -379,7 +379,7 @@ describe("defineHulyTool execute — error gate coverage (FR-14)", () => {
       name: "get_doc",
       label: "Doc",
       description: "get",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "config AKIAIOSFODNN7EXAMPLE was here",
       }),
@@ -395,7 +395,7 @@ describe("defineHulyTool execute — error gate coverage (FR-14)", () => {
       name: "list_documents",
       label: "List docs",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => {
         throw new Error("domain not found: tracker:class:Document");
       },
@@ -417,7 +417,7 @@ describe("defineHulyTool execute — error gate coverage (FR-14)", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => {
         throw new Error("unexpected runtime glitch");
       },
@@ -436,7 +436,7 @@ describe("defineHulyTool execute — destructiveContext safety", () => {
       name: "delete_issue",
       label: "Delete",
       description: "delete",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       destructive: true,
       destructiveContext: () => {
         throw new Error("domain bug");
@@ -458,7 +458,7 @@ describe("defineHulyTool execute — result convert", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "Found 3 issues",
         // scalar-only details (no array/id) → append no-op → content shape sạch
@@ -476,7 +476,7 @@ describe("defineHulyTool execute — result convert", () => {
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({ content: "Not found", isError: true }),
     });
     const result = await tool.execute("tc1", {}, undefined, undefined, makeCtx());
@@ -491,7 +491,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "Found 2 issue(s).",
         details: {
@@ -520,7 +520,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "create_issue",
       label: "Create",
       description: "create",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: 'Created issue "Test".',
         details: { id: "abc123", identifier: "PD-42", title: "Test" },
@@ -538,7 +538,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "noop_tool",
       label: "Noop",
       description: "noop",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({ content: "Done." }),
     });
     const result = await tool.execute("tc1", {}, undefined, undefined, makeCtx(false));
@@ -553,7 +553,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "Found 1 issue(s).",
         details: { count: 1, issues: [{ identifier: "PD-1", title: "X" }] },
@@ -576,7 +576,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "add_comment",
       label: "Comment",
       description: "add",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "Comment added to PD-1.",
         details: { id: "comment-xyz", identifier: "PD-1" },
@@ -596,7 +596,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "Found 1 issue(s).",
         details: { count: 1, issues: [{ identifier: "PD-1", title: "X" }] },
@@ -625,7 +625,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "list_issues",
       label: "List",
       description: "list",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "Found 60 issue(s).",
         details: { count: 60, issues: big },
@@ -645,7 +645,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "create_issue",
       label: "Create",
       description: "create",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "Issue not found.",
         isError: true,
@@ -667,7 +667,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "noop",
       label: "N",
       description: "n",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({ content: "Done.", details: null }),
     });
     const result = await tool.execute("tc1", {}, undefined, undefined, makeCtx(false));
@@ -679,7 +679,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "noop",
       label: "N",
       description: "n",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({ content: "Done.", details: {} }),
     });
     const result = await tool.execute("tc1", {}, undefined, undefined, makeCtx(false));
@@ -691,7 +691,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "list_tags",
       label: "T",
       description: "t",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "Found 2 tag(s).",
         details: { count: 2, tags: ["bug", "urgent"] },
@@ -709,7 +709,7 @@ describe("defineHulyTool execute — non-TUI surface details (T-40 #22 #26)", ()
       name: "search",
       label: "S",
       description: "s",
-      parameters: Type.Object({}),
+      parameters: z.object({}),
       handler: async () => ({
         content: "Search results.",
         details: {

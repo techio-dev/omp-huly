@@ -1,7 +1,7 @@
 // tools/domains/components.ts — Components domain (6 tools).
 // Design: 06-api.md §4 Components. CRUD + set_issue_component.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { COMPONENT_CLASS, ISSUE_CLASS, PROJECT_CLASS, PERSON_CLASS } from "./_class-refs.js";
 import {
@@ -22,7 +22,7 @@ export const tools: HulyToolDefinition[] = [
     label: "List components",
     description: "List components trong project.",
     needsProject: true,
-    parameters: Type.Object({ workspace: workspaceParam, project: projectParam }),
+    parameters: z.object({ workspace: workspaceParam, project: projectParam }),
     async handler(_params, tctx) {
       // T-71: space scoping (KHÔNG findAll global cross-project).
       const space = await getProjectSpace(tctx.client, tctx.project!);
@@ -52,10 +52,10 @@ export const tools: HulyToolDefinition[] = [
     label: "Get component",
     description: "Get component by id.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      component: Type.String(),
+      component: z.string(),
     }),
     async handler(params, tctx) {
       // T-81 #104: scope component lookup theo project (space = project._id).
@@ -119,12 +119,12 @@ export const tools: HulyToolDefinition[] = [
     label: "Create component",
     description: "Create component.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      label: Type.String(),
-      description: Type.Optional(Type.String()),
-      lead: Type.Optional(Type.String({ description: "Lead email/name." })),
+      label: z.string(),
+      description: z.optional(z.string()),
+      lead: z.optional(z.string().describe("Lead email/name.")),
     }),
     async handler(params, tctx) {
       const project = await tctx.client.findOne(PROJECT_CLASS, {
@@ -175,13 +175,13 @@ export const tools: HulyToolDefinition[] = [
     label: "Update component",
     description: "Update component (label, description, lead).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      component: Type.String(),
-      label: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
-      lead: Type.Optional(Type.String()),
+      component: z.string(),
+      label: z.optional(z.string()),
+      description: z.optional(z.string()),
+      lead: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       // T-81 #104: scope component lookup theo project.
@@ -237,12 +237,12 @@ export const tools: HulyToolDefinition[] = [
     label: "Set issue component",
     description: "Gán component cho issue.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
       // T-81G #107: component = label OR _id; null → clear (unassign).
-      component: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+      component: z.optional(z.union([z.string(), z.null()])),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {
@@ -308,10 +308,10 @@ export const tools: HulyToolDefinition[] = [
       type: "component",
       id: (p as { component?: string }).component ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      component: Type.String(),
+      component: z.string(),
     }),
     async handler(params, tctx) {
       // T-81 #104: scope component lookup theo project.

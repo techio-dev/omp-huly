@@ -9,7 +9,7 @@
 //   5. huly_delete_project         — destructive, confirm gate
 //   6. huly_list_statuses          — workflow statuses cho project
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { PROJECT_CLASS, CLASSIC_PROJECT_TYPE_REF } from "./_class-refs.js";
 import {
@@ -27,10 +27,10 @@ export const tools: HulyToolDefinition[] = [
     label: "List projects",
     description: "List Huly projects trong workspace.",
     promptSnippet: "List Huly projects.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      includeArchived: Type.Optional(
-        Type.Boolean({ description: "Include archived projects (default false)." }),
+      includeArchived: z.optional(
+        z.boolean().describe("Include archived projects (default false)."),
       ),
     }),
     async handler(params, tctx) {
@@ -61,7 +61,7 @@ export const tools: HulyToolDefinition[] = [
     description: "Get Huly project by identifier.",
     promptSnippet: "Get Huly project details.",
     needsProject: true,
-    parameters: Type.Object({ workspace: workspaceParam, project: projectParam }),
+    parameters: z.object({ workspace: workspaceParam, project: projectParam }),
     async handler(_params, tctx) {
       const project = await tctx.client.findOne(PROJECT_CLASS, {
         identifier: tctx.project,
@@ -105,15 +105,11 @@ export const tools: HulyToolDefinition[] = [
     description:
       "Create Huly project. Idempotent (findOne by identifier trước). Returns identifier.",
     promptSnippet: "Create a new Huly project.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      name: Type.String({ description: "Project name." }),
-      identifier: Type.String({
-        description: "1-5 chars uppercase, start with letter.",
-        minLength: 1,
-        maxLength: 5,
-      }),
-      description: Type.Optional(Type.String()),
+      name: z.string().describe("Project name."),
+      identifier: z.string().describe("1-5 chars uppercase, start with letter.").min(1).max(5),
+      description: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       // T-67 #75: idempotent — findOne by identifier trước (spec §9).
@@ -161,11 +157,11 @@ export const tools: HulyToolDefinition[] = [
     label: "Update project",
     description: "Update Huly project (name, description).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      name: Type.Optional(Type.String()),
-      description: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+      name: z.optional(z.string()),
+      description: z.optional(z.union([z.string(), z.null()])),
     }),
     async handler(params, tctx) {
       const existing = await tctx.client.findOne(PROJECT_CLASS, {
@@ -214,7 +210,7 @@ export const tools: HulyToolDefinition[] = [
       type: "project",
       id: (p as { project?: string }).project ?? "<unknown>",
     }),
-    parameters: Type.Object({ workspace: workspaceParam, project: projectParam }),
+    parameters: z.object({ workspace: workspaceParam, project: projectParam }),
     async handler(_params, tctx) {
       const existing = await tctx.client.findOne(PROJECT_CLASS, {
         identifier: tctx.project,
@@ -241,7 +237,7 @@ export const tools: HulyToolDefinition[] = [
     label: "List statuses",
     description: "List workflow statuses cho project.",
     needsProject: true,
-    parameters: Type.Object({ workspace: workspaceParam, project: projectParam }),
+    parameters: z.object({ workspace: workspaceParam, project: projectParam }),
     async handler(_params, tctx) {
       // T-71: ProjectType.statuses traversal (KHÔNG findAll global).
       const result = await getProjectStatuses(tctx.client, tctx.project!);

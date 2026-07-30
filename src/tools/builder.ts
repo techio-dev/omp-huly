@@ -13,7 +13,7 @@
 // Domain module chỉ khai báo opts (schema + handler thuần), builder lo phần binding.
 
 import type { ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import type { Static, TObject } from "typebox";
+import { z } from "zod";
 import { getClient } from "../client/pool.js";
 import { mapError, sanitize } from "../client/errors.js";
 import type { HulyClient, CurrentUser } from "../client/client.js";
@@ -27,7 +27,7 @@ import {
 import { confirmDestructive, type ConfirmContext } from "./confirm.js";
 
 /** Tool parameter schema phải là TObject (Type.Object) cho LLM-callable. */
-export type ToolParams = TObject;
+export type ToolParams = z.ZodObject<z.ZodRawShape>;
 
 /** Error class identifier (re-export từ errors.ts — single source). */
 export type { ErrorClass, HulyError } from "../client/errors.js";
@@ -66,14 +66,14 @@ export interface HulyToolResult<TDetails = unknown> {
 
 /**
  * Handler signature cho Huly tool.
- * - `params`: validated theo schema (typebox Static<P>)
+ * - `params`: validated theo schema (Zod z.infer<P>)
  * - `toolCtx`: resolved binding (client + workspace + project + user)
  * - Return HulyToolResult (builder convert sang AgentToolResult)
  *
  * TDetails default `unknown` — caller KHÔNG cần khai báo, return type flexible.
  */
 export type HulyToolHandler<P extends ToolParams, TDetails = unknown> = (
-  params: Static<P>,
+  params: z.infer<P>,
   toolCtx: HulyToolContext,
 ) => Promise<HulyToolResult<TDetails>>;
 
@@ -103,14 +103,14 @@ export interface DefineHulyToolOptions<P extends ToolParams = ToolParams, TDetai
   /** Parameter schema (typebox Type.Object). */
   parameters: P;
   /** Handler thuần — nhận resolved binding, return HulyToolResult. */
-  handler: (params: Static<P>, toolCtx: HulyToolContext) => Promise<HulyToolResult<TDetails>>;
+  handler: (params: z.infer<P>, toolCtx: HulyToolContext) => Promise<HulyToolResult<TDetails>>;
   /** True → confirm gate (FR-09 D9). Builder call confirmDestructive trước handler. */
   destructive?: boolean;
   /**
    * Detail object cho confirm prompt (khi destructive=true).
    * Builder call confirmDestructive({ type, id, detail }).
    */
-  destructiveContext?: (params: Static<P>) => ConfirmContext;
+  destructiveContext?: (params: z.infer<P>) => ConfirmContext;
   /**
    * True → tool cần project resolved (issues/milestones/components/templates).
    * False → tool global (workspaces, search, contacts, ...).
@@ -142,7 +142,7 @@ export interface HulyToolDefinition<P extends ToolParams = ToolParams, TDetails 
   parameters: P;
   execute: (
     toolCallId: string,
-    params: Static<P>,
+    params: z.infer<P>,
     signal: AbortSignal | undefined,
     onUpdate:
       | ((partialResult: {
@@ -189,7 +189,7 @@ export function defineHulyTool<P extends ToolParams>(
     parameters: opts.parameters,
 
     async execute(_toolCallId, rawParams, _signal, _onUpdate, ctx) {
-      const params = { ...(rawParams as Static<P>) } as Record<string, unknown>;
+      const params = { ...(rawParams as z.infer<P>) } as Record<string, unknown>;
       const resolverCtx: ResolverCtx = { cwd: ctx.cwd };
 
       // 1. Resolve workspace
@@ -246,7 +246,7 @@ export function defineHulyTool<P extends ToolParams>(
         let destructiveCtx: ConfirmContext;
         if (opts.destructiveContext) {
           try {
-            destructiveCtx = opts.destructiveContext(rawParams as Static<P>);
+            destructiveCtx = opts.destructiveContext(rawParams as z.infer<P>);
           } catch {
             // destructiveContext throw (domain bug) → fallback safe defaults
             destructiveCtx = { type: opts.name, id: "<unknown>" };
@@ -271,7 +271,7 @@ export function defineHulyTool<P extends ToolParams>(
 
       // 7. Call handler
       try {
-        const result = await opts.handler(params as Static<P>, {
+        const result = await opts.handler(params as z.infer<P>, {
           ctx,
           workspace,
           project,

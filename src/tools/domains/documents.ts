@@ -21,7 +21,7 @@
 //     Library KHÔNG có updateMarkup — edit = uploadMarkup + updateDoc (new ref).
 //   - parent: Ref<Document> (document hierarchy), rank (lexorank)
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import {
   TEAMSPACE_CLASS,
@@ -44,7 +44,7 @@ export const tools: HulyToolDefinition[] = [
     name: "list_teamspaces",
     label: "List teamspaces",
     description: "List teamspaces (document spaces).",
-    parameters: Type.Object({ workspace: workspaceParam, limit: limitParam }),
+    parameters: z.object({ workspace: workspaceParam, limit: limitParam }),
     async handler(params, tctx) {
       const limit = typeof params.limit === "number" ? params.limit : 50;
       // T-88 #123: sort name Ascending (trusted). T-90: native TeamspaceDoc.
@@ -80,9 +80,9 @@ export const tools: HulyToolDefinition[] = [
     name: "get_teamspace",
     label: "Get teamspace",
     description: "Get teamspace by id.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      teamspace: Type.String(),
+      teamspace: z.string(),
     }),
     async handler(params, tctx) {
       const s = await tctx.client.findOne<TeamspaceDoc>(TEAMSPACE_CLASS, { _id: params.teamspace });
@@ -123,11 +123,11 @@ export const tools: HulyToolDefinition[] = [
     description:
       "Create teamspace. Idempotent (returns existing if name exists). " +
       "Returns teamspace id for use in document tools.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      name: Type.String(),
-      description: Type.Optional(Type.String()),
-      private: Type.Optional(Type.Boolean()),
+      name: z.string(),
+      description: z.optional(z.string()),
+      private: z.optional(z.boolean()),
     }),
     async handler(params, tctx) {
       // Idempotent: findOne by name (archived:false).
@@ -166,12 +166,12 @@ export const tools: HulyToolDefinition[] = [
     name: "update_teamspace",
     label: "Update teamspace",
     description: "Update teamspace (name, description, private).",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      teamspace: Type.String(),
-      name: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
-      private: Type.Optional(Type.Boolean()),
+      teamspace: z.string(),
+      name: z.optional(z.string()),
+      description: z.optional(z.string()),
+      private: z.optional(z.boolean()),
     }),
     async handler(params, tctx) {
       const s = await tctx.client.findOne(TEAMSPACE_CLASS, { _id: params.teamspace });
@@ -213,9 +213,9 @@ export const tools: HulyToolDefinition[] = [
       type: "teamspace",
       id: (p as { teamspace?: string }).teamspace ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      teamspace: Type.String(),
+      teamspace: z.string(),
     }),
     async handler(params, tctx) {
       const s = await tctx.client.findOne(TEAMSPACE_CLASS, { _id: params.teamspace });
@@ -241,11 +241,11 @@ export const tools: HulyToolDefinition[] = [
     name: "list_documents",
     label: "List documents",
     description: "List documents in a teamspace.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      teamspace: Type.String(),
+      teamspace: z.string(),
       limit: limitParam,
-      titleSearch: Type.Optional(Type.String()),
+      titleSearch: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       const ts = await tctx.client.findOne<TeamspaceDoc>(TEAMSPACE_CLASS, {
@@ -293,9 +293,9 @@ export const tools: HulyToolDefinition[] = [
     name: "get_document",
     label: "Get document",
     description: "Get document by id with full content (markdown).",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      document: Type.String(),
+      document: z.string(),
     }),
     async handler(params, tctx) {
       const d = await tctx.client.findOne<DocumentDoc>(DOCUMENT_CLASS, { _id: params.document });
@@ -351,11 +351,11 @@ export const tools: HulyToolDefinition[] = [
     name: "create_document",
     label: "Create document",
     description: "Create document in a teamspace with optional markdown content.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      teamspace: Type.String(),
-      title: Type.String(),
-      content: Type.Optional(Type.String({ description: "Markdown content." })),
+      teamspace: z.string(),
+      title: z.string(),
+      content: z.optional(z.string().describe("Markdown content.")),
     }),
     async handler(params, tctx) {
       const ts = await tctx.client.findOne(TEAMSPACE_CLASS, { _id: params.teamspace });
@@ -399,14 +399,14 @@ export const tools: HulyToolDefinition[] = [
     name: "edit_document",
     label: "Edit document",
     description: "Edit document. Either full content replace OR search-and-replace.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      document: Type.String(),
-      old_text: Type.Optional(Type.String()),
-      new_text: Type.Optional(Type.String()),
-      content: Type.Optional(Type.String({ description: "Full new content (markdown)." })),
-      replace_all: Type.Optional(
-        Type.Boolean({ description: "true nếu old_text match nhiều (default false)." }),
+      document: z.string(),
+      old_text: z.optional(z.string()),
+      new_text: z.optional(z.string()),
+      content: z.optional(z.string().describe("Full new content (markdown).")),
+      replace_all: z.optional(
+        z.boolean().describe("true nếu old_text match nhiều (default false)."),
       ),
     }),
     async handler(params, tctx) {
@@ -523,9 +523,9 @@ export const tools: HulyToolDefinition[] = [
       type: "document",
       id: (p as { document?: string }).document ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      document: Type.String(),
+      document: z.string(),
     }),
     async handler(params, tctx) {
       const d = await tctx.client.findOne(DOCUMENT_CLASS, { _id: params.document });

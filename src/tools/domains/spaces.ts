@@ -1,7 +1,7 @@
 // tools/domains/spaces.ts — Spaces domain (5 tools).
 // Design: 06-api.md §4 Spaces. Read-heavy + update.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { SPACE_CLASS } from "./_class-refs.js";
 import { workspaceParam, safeUpdateDoc } from "./_common.js";
@@ -12,10 +12,10 @@ export const tools: HulyToolDefinition[] = [
     name: "list_spaces",
     label: "List spaces",
     description: "List Huly spaces (teamspaces + tracker spaces).",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      includeArchived: Type.Optional(
-        Type.Boolean({ description: "Include archived spaces (default false)." }),
+      includeArchived: z.optional(
+        z.boolean().describe("Include archived spaces (default false)."),
       ),
     }),
     async handler(params, tctx) {
@@ -43,9 +43,9 @@ export const tools: HulyToolDefinition[] = [
     name: "get_space",
     label: "Get space",
     description: "Get space by id.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      space: Type.String(),
+      space: z.string(),
     }),
     async handler(params, tctx) {
       // T-81G #107: name-fallback — _id trước, exact name sau, ambiguous → isError.
@@ -107,7 +107,7 @@ export const tools: HulyToolDefinition[] = [
     description:
       "UNAVAILABLE — space types = SpaceTypeDescriptor config (drive plugin not " +
       "bundled). Create/browse spaces via Huly UI.",
-    parameters: Type.Object({ workspace: workspaceParam }),
+    parameters: z.object({ workspace: workspaceParam }),
     async handler(_params, _tctx) {
       return {
         content:
@@ -127,9 +127,9 @@ export const tools: HulyToolDefinition[] = [
     description:
       "UNAVAILABLE — space type = SpaceTypeDescriptor config (drive plugin not " +
       "bundled). Browse via Huly UI.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      spaceType: Type.String(),
+      spaceType: z.string(),
     }),
     async handler(_params, _tctx) {
       return {
@@ -147,15 +147,15 @@ export const tools: HulyToolDefinition[] = [
     name: "update_space",
     label: "Update space",
     description: "Update space (name, description, private, archived, autoJoin).",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      space: Type.String(),
-      name: Type.Optional(Type.String()),
-      description: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+      space: z.string(),
+      name: z.optional(z.string()),
+      description: z.optional(z.union([z.string(), z.null()])),
       // T-81G #107: add private, archived, autoJoin (trusted có 5 fields).
-      private: Type.Optional(Type.Boolean()),
-      archived: Type.Optional(Type.Boolean()),
-      autoJoin: Type.Optional(Type.Boolean()),
+      private: z.optional(z.boolean()),
+      archived: z.optional(z.boolean()),
+      autoJoin: z.optional(z.boolean()),
     }),
     async handler(params, tctx) {
       const s = await tctx.client.findOne(SPACE_CLASS, { _id: params.space });

@@ -1,7 +1,7 @@
 // tools/domains/attachments.ts — Attachments domain (5 tools).
 // Design: 06-api.md §4 Attachments.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { ATTACHMENT_CLASS, ISSUE_CLASS, spaceRef } from "./_class-refs.js";
 import { workspaceParam, projectParam, identifierParam, resolveIdentifier } from "./_common.js";
@@ -13,7 +13,7 @@ export const tools: HulyToolDefinition[] = [
     label: "List attachments",
     description: "List attachments attached to entity.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
@@ -48,9 +48,9 @@ export const tools: HulyToolDefinition[] = [
     name: "get_attachment",
     label: "Get attachment",
     description: "Get attachment metadata by id.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      attachment: Type.String(),
+      attachment: z.string(),
     }),
     async handler(params, tctx) {
       const a = await tctx.client.findOne(ATTACHMENT_CLASS, { _id: params.attachment });
@@ -79,16 +79,16 @@ export const tools: HulyToolDefinition[] = [
     label: "Add attachment",
     description:
       "Add attachment to entity. Uploads base64 data → blob, attaches via addCollection.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      attachedTo: Type.String(),
-      attachedToClass: Type.Optional(
-        Type.String({ description: "Target class (default tracker:class:Issue)." }),
+      attachedTo: z.string(),
+      attachedToClass: z.optional(
+        z.string().describe("Target class (default tracker:class:Issue)."),
       ),
-      filename: Type.String(),
-      contentType: Type.String(),
-      data: Type.Optional(Type.String({ description: "Base64 data (raw, no data: URL prefix)." })),
-      description: Type.Optional(Type.String()),
+      filename: z.string(),
+      contentType: z.string(),
+      data: z.optional(z.string().describe("Base64 data (raw, no data: URL prefix).")),
+      description: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       if (!params.data) {
@@ -148,14 +148,14 @@ export const tools: HulyToolDefinition[] = [
     label: "Add issue attachment",
     description: "Add attachment to issue.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      filename: Type.String(),
-      contentType: Type.String(),
-      data: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
+      filename: z.string(),
+      contentType: z.string(),
+      data: z.optional(z.string()),
+      description: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       if (!params.data) {
@@ -216,9 +216,9 @@ export const tools: HulyToolDefinition[] = [
     name: "download_attachment",
     label: "Download attachment",
     description: "Get attachment content (base64). Downloads blob via storageClient.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      attachment: Type.String(),
+      attachment: z.string(),
     }),
     async handler(params, tctx) {
       const a = await tctx.client.findOne(ATTACHMENT_CLASS, { _id: params.attachment });

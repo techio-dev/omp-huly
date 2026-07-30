@@ -8,7 +8,7 @@
 // tất cả 4 label tools, hướng dẫn user dùng tag tools (huly_list_tags /
 // huly_create_tag / huly_attach_tag) thay thế.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { workspaceParam } from "./_common.js";
 
@@ -29,7 +29,7 @@ export const tools: HulyToolDefinition[] = [
     name: "list_labels",
     label: "List labels",
     description: "UNAVAILABLE — Label deprecated in Huly runtime. Use huly_list_tags instead.",
-    parameters: Type.Object({ workspace: workspaceParam }),
+    parameters: z.object({ workspace: workspaceParam }),
     async handler(_params, _tctx) {
       return {
         content: labelUnavailableMessage("list_labels"),
@@ -48,12 +48,12 @@ export const tools: HulyToolDefinition[] = [
     name: "create_label",
     label: "Create label",
     description: "UNAVAILABLE — Label deprecated in Huly runtime. Use huly_create_tag instead.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      title: Type.String(),
-      color: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
-      category: Type.Optional(Type.String()),
+      title: z.string(),
+      color: z.optional(z.string()),
+      description: z.optional(z.string()),
+      category: z.optional(z.string()),
     }),
     async handler(_params, _tctx) {
       return {
@@ -73,13 +73,13 @@ export const tools: HulyToolDefinition[] = [
     name: "update_label",
     label: "Update label",
     description: "UNAVAILABLE — Label deprecated in Huly runtime. Use huly_update_tag instead.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      label: Type.String(),
-      title: Type.Optional(Type.String()),
-      color: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
-      category: Type.Optional(Type.String()),
+      label: z.string(),
+      title: z.optional(z.string()),
+      color: z.optional(z.string()),
+      description: z.optional(z.string()),
+      category: z.optional(z.string()),
     }),
     async handler(_params, _tctx) {
       return {
@@ -99,9 +99,9 @@ export const tools: HulyToolDefinition[] = [
     name: "delete_label",
     label: "Delete label",
     description: "UNAVAILABLE — Label deprecated in Huly runtime. Use huly_delete_tag instead.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      label: Type.String(),
+      label: z.string(),
     }),
     async handler(_params, _tctx) {
       return {

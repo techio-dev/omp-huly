@@ -7,7 +7,7 @@
 // (document-snapshots.ts:74,80,95,121,139 dùng documentPlugin.class.DocumentSnapshot).
 // Snapshot content = MarkupBlobRef → fetchMarkup.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { DOCUMENT_SNAPSHOT_CLASS } from "./_class-refs.js";
 import { workspaceParam } from "./_common.js";
@@ -19,10 +19,10 @@ export const tools: HulyToolDefinition[] = [
     name: "list_document_snapshots",
     label: "List document snapshots",
     description: "List document snapshots (version history) for a document.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      document: Type.String({ description: "Document id." }),
-      limit: Type.Optional(Type.Number({ description: "Max snapshots to return." })),
+      document: z.string().describe("Document id."),
+      limit: z.optional(z.number().describe("Max snapshots to return.")),
     }),
     async handler(params, tctx) {
       // T-85 #120: sort newest-first (trusted createdOn: Descending). T-90: native DocumentSnapshotDoc.
@@ -57,9 +57,9 @@ export const tools: HulyToolDefinition[] = [
     name: "get_document_snapshot",
     label: "Get document snapshot",
     description: "Get a document snapshot content (markdown) by snapshot id.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      snapshot: Type.String({ description: "Snapshot id." }),
+      snapshot: z.string().describe("Snapshot id."),
     }),
     async handler(params, tctx) {
       const s = await tctx.client.findOne<DocumentSnapshotDoc>(DOCUMENT_SNAPSHOT_CLASS, {

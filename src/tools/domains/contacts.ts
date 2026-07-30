@@ -1,7 +1,7 @@
 // tools/domains/contacts.ts — Contacts domain (2 tools, read-only).
 // Design: 06-api.md §4 Contacts. List employees/persons cho assignee resolution.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { PERSON_CLASS, EMPLOYEE_CLASS, CHANNEL_CLASS, EMAIL_PROVIDER } from "./_class-refs.js";
 import { workspaceParam, limitParam } from "./_common.js";
@@ -47,7 +47,7 @@ export const tools: HulyToolDefinition[] = [
     name: "list_employees",
     label: "List employees",
     description: "List employees trong workspace (cho assignee resolution).",
-    parameters: Type.Object({ workspace: workspaceParam, limit: limitParam }),
+    parameters: z.object({ workspace: workspaceParam, limit: limitParam }),
     async handler(params, tctx) {
       const limit = typeof params.limit === "number" ? params.limit : 50;
       const employees = await tctx.client.findAll(EMPLOYEE_CLASS, {}, { limit });
@@ -71,7 +71,7 @@ export const tools: HulyToolDefinition[] = [
     name: "list_persons",
     label: "List persons",
     description: "List persons (contacts) trong workspace.",
-    parameters: Type.Object({ workspace: workspaceParam, limit: limitParam }),
+    parameters: z.object({ workspace: workspaceParam, limit: limitParam }),
     async handler(params, tctx) {
       const limit = typeof params.limit === "number" ? params.limit : 50;
       const persons = await tctx.client.findAll(PERSON_CLASS, {}, { limit });

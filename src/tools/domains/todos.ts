@@ -1,7 +1,7 @@
 // tools/domains/todos.ts — Todos domain (7 tools).
 // Design: 06-api.md §4 Todos. attachedTo: {type:'issue', project, identifier}.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { ISSUE_CLASS, TODO_CLASS, PROJECT_TODO_CLASS, TODOS_SPACE } from "./_class-refs.js";
 import {
@@ -28,13 +28,13 @@ const TODO_PRIORITY_MAP: Record<string, number> = {
 };
 
 /** Priority param schema (string → number enum mapping). */
-const todoPrioritySchema = Type.Optional(
-  Type.Union([
-    Type.Literal("urgent"),
-    Type.Literal("high"),
-    Type.Literal("medium"),
-    Type.Literal("low"),
-    Type.Literal("no-priority"),
+const todoPrioritySchema = z.optional(
+  z.union([
+    z.literal("urgent"),
+    z.literal("high"),
+    z.literal("medium"),
+    z.literal("low"),
+    z.literal("no-priority"),
   ]),
 );
 
@@ -45,7 +45,7 @@ export const tools: HulyToolDefinition[] = [
     label: "List todos",
     description: "List todos attached to issue.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
@@ -83,9 +83,9 @@ export const tools: HulyToolDefinition[] = [
     name: "get_todo",
     label: "Get todo",
     description: "Get todo by id.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      todo: Type.String(),
+      todo: z.string(),
     }),
     async handler(params, tctx) {
       const t = (await tctx.client.findOne(TODO_CLASS, { _id: params.todo })) as {
@@ -127,13 +127,13 @@ export const tools: HulyToolDefinition[] = [
     needsProject: true,
     needsAssignee: true,
     assigneeField: "owner",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      title: Type.String(),
-      description: Type.Optional(Type.String()),
-      dueDate: Type.Optional(Type.Integer()),
+      title: z.string(),
+      description: z.optional(z.string()),
+      dueDate: z.optional(z.number().int()),
       priority: todoPrioritySchema,
     }),
     async handler(params, tctx) {
@@ -215,18 +215,18 @@ export const tools: HulyToolDefinition[] = [
     description:
       "Update todo (title, description, owner, priority, visibility, dueDate). " +
       "dueDate=null clears ($unset).",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      todo: Type.String(),
-      title: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
-      owner: Type.Optional(Type.String({ description: "Owner email/name." })),
+      todo: z.string(),
+      title: z.optional(z.string()),
+      description: z.optional(z.string()),
+      owner: z.optional(z.string().describe("Owner email/name.")),
       priority: todoPrioritySchema,
-      visibility: Type.Optional(
-        Type.Union([Type.Literal("public"), Type.Literal("freeBusy"), Type.Literal("private")]),
+      visibility: z.optional(
+        z.union([z.literal("public"), z.literal("freeBusy"), z.literal("private")]),
       ),
       // T-79G #106: dueDate=null → \$unset clear.
-      dueDate: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+      dueDate: z.optional(z.union([z.number().int(), z.null()])),
     }),
     async handler(params, tctx) {
       const t = await tctx.client.findOne(TODO_CLASS, { _id: params.todo });
@@ -294,9 +294,9 @@ export const tools: HulyToolDefinition[] = [
     name: "complete_todo",
     label: "Complete todo",
     description: "Mark todo done.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      todo: Type.String(),
+      todo: z.string(),
     }),
     async handler(params, tctx) {
       const t = await tctx.client.findOne(TODO_CLASS, { _id: params.todo });
@@ -323,9 +323,9 @@ export const tools: HulyToolDefinition[] = [
     name: "reopen_todo",
     label: "Reopen todo",
     description: "Mark todo not done (reopen).",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      todo: Type.String(),
+      todo: z.string(),
     }),
     async handler(params, tctx) {
       const t = await tctx.client.findOne(TODO_CLASS, { _id: params.todo });
@@ -357,9 +357,9 @@ export const tools: HulyToolDefinition[] = [
       type: "todo",
       id: (p as { todo?: string }).todo ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      todo: Type.String(),
+      todo: z.string(),
     }),
     async handler(params, tctx) {
       const t = (await tctx.client.findOne(TODO_CLASS, { _id: params.todo })) as {
