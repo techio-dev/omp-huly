@@ -38,15 +38,18 @@ import {
 import { loadConfig, type Config } from "./config/config.js";
 
 /**
- * Render hook signature (pi ToolDefinition.renderResult subset).
- * ToolRenderContext KHÔNG re-export public từ pi → dùng context minimal.
- * Dùng AgentToolResult + ToolRenderResultOptions thật từ pi (type-safe hơn cast toàn bộ).
+ * Render hook signature (omp ToolDefinition.renderResult).
+ * omp calls renderResult(result, options, theme, args) — `args` is the tool's
+ * parsed params (NOT pi's { lastComponent }). The render funcs read
+ * `context.lastComponent` for Text reuse; with omp `args` that field is absent
+ * → getOrCreateText() always makes a fresh Text (no crash, minor: no reuse).
+ * AgentToolResult + ToolRenderResultOptions are omp types (type-safe).
  */
 type RenderHook = (
   result: AgentToolResult<unknown>,
   options: ToolRenderResultOptions,
   theme: unknown,
-  context: { lastComponent?: Component },
+  args: unknown,
 ) => Component;
 
 /** Map tool name → render hook (3 high-value per design 04 §6 D12). */
