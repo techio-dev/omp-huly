@@ -66,6 +66,10 @@ export interface CommandContext {
   credentialsPath?: string;
   /** Override config path (test). */
   configPath?: string;
+  /** Override legacy ~/.pi credentials path (test isolation; prod undefined → real ~/.pi migration). */
+  legacyCredentialsPath?: string;
+  /** Override legacy ~/.pi config path (test isolation; prod undefined → real ~/.pi migration). */
+  legacyConfigPath?: string;
 }
 
 /** Parse subcommand + positional args từ raw command arg string. */
@@ -289,7 +293,7 @@ async function promptAddWorkspace(name: string, ctx: CommandContext): Promise<st
 
 /** Tạo id-handle unik dựa trên name (suffix -2, -3 nếu trùng). */
 async function uniqueWorkspaceId(name: string, ctx: CommandContext): Promise<string> {
-  const creds = await loadCredentials(ctx.credentialsPath);
+  const creds = await loadCredentials(ctx.credentialsPath, ctx.legacyCredentialsPath);
   if (!(name in creds.workspaces)) return name;
   let i = 2;
   while (`${name}-${i}` in creds.workspaces) i++;
@@ -359,7 +363,7 @@ async function runStatus(ctx: CommandContext): Promise<CommandResult> {
 
   // Config transport
   try {
-    const config = await loadConfig(ctx.configPath);
+    const config = await loadConfig(ctx.configPath, ctx.legacyConfigPath);
     lines.push(`transport: ${config.transport ?? "ws"}`);
   } catch (e) {
     lines.push(`transport: error reading config — ${errorMessage(e)}`);
@@ -367,7 +371,7 @@ async function runStatus(ctx: CommandContext): Promise<CommandResult> {
 
   // Credentials count
   try {
-    const creds = await loadCredentials(ctx.credentialsPath);
+    const creds = await loadCredentials(ctx.credentialsPath, ctx.legacyCredentialsPath);
     lines.push(`workspaces: ${Object.keys(creds.workspaces).length} configured`);
   } catch (e) {
     lines.push(`workspaces: error reading credentials — ${errorMessage(e)}`);
@@ -435,7 +439,7 @@ async function runWorkspace(positional: string[], ctx: CommandContext): Promise<
 /** `/huly workspace list` — list configured workspaces (id + url + workspace name). */
 async function runWorkspaceList(ctx: CommandContext): Promise<CommandResult> {
   try {
-    const creds = await loadCredentials(ctx.credentialsPath);
+    const creds = await loadCredentials(ctx.credentialsPath, ctx.legacyCredentialsPath);
     const ids = Object.keys(creds.workspaces);
     if (ids.length === 0) {
       return {

@@ -31,6 +31,9 @@ vi.mock("../../client/pool.js", () => ({
 const TEST_DIR = join(tmpdir(), `pi-huly-cmd-test-${process.pid}`);
 const CRED_PATH = join(TEST_DIR, "credentials.json");
 const CONFIG_PATH = join(TEST_DIR, "config.json");
+// Legacy paths point to NON-EXISTENT temp files → isolates tests from the user's real ~/.pi (migration no-op).
+const LEGACY_CRED_PATH = join(TEST_DIR, "legacy-credentials.json");
+const LEGACY_CONFIG_PATH = join(TEST_DIR, "legacy-config.json");
 const CWD = "/fake/project";
 
 function makeUI(overrides: Partial<CommandUI> = {}): CommandUI {
@@ -50,6 +53,8 @@ function makeCtx(overrides: Partial<CommandContext> = {}): CommandContext {
     cwd: CWD,
     credentialsPath: CRED_PATH,
     configPath: CONFIG_PATH,
+    legacyCredentialsPath: LEGACY_CRED_PATH,
+    legacyConfigPath: LEGACY_CONFIG_PATH,
     ...overrides,
   };
 }

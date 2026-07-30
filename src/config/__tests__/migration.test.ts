@@ -40,7 +40,8 @@ describe("legacy ~/.pi -> ~/.omp auto-migration", () => {
     // omp store empty/absent -> loadCredentials(ompPath, legacyPath) migrates
     const creds = await loadCredentials(join(ompDir, "credentials.json"), legacyPath);
 
-    expect(creds.workspaces["corp-prod"]?.token).toBe("tok_123");
+    const ws = creds.workspaces["corp-prod"];
+    expect(ws !== undefined && "token" in ws ? ws.token : undefined).toBe("tok_123");
     // persisted to omp store, chmod 600
     const ompPath = join(ompDir, "credentials.json");
     const st = statSync(ompPath);
@@ -67,7 +68,8 @@ describe("legacy ~/.pi -> ~/.omp auto-migration", () => {
     chmodSync(legacyPath, 0o600);
 
     const creds = await loadCredentials(ompPath, legacyPath);
-    expect(creds.workspaces["corp-prod"]?.token).toBe("new_tok"); // omp wins
+    const ws2 = creds.workspaces["corp-prod"];
+    expect(ws2 !== undefined && "token" in ws2 ? ws2.token : undefined).toBe("new_tok"); // omp wins
   });
 
   it("migrates legacy project bindings into omp config on load", async () => {

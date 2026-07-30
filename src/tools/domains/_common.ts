@@ -50,7 +50,10 @@ export function projectParams() {
 
 /**
  * Resolve issue identifier: "<PROJ>-<num>" → as-is; raw num → "<project>-<num>".
- * Caller phải đảm bảo project resolved (tool params có project field + builder validate).
+ * Huly identifier format. Vd "PD-123" hoặc "123" (project=PD).
+ *
+ * Cross-project guard: nếu input có prefix "<X>-<num>" mà X != project →
+ * throw Error (KHÔNG silently query sai project). Caller catch → isError.
  */
 /**
  * T-71: Resolve project _id (= space cho AttachedDoc scoping) từ identifier.
@@ -61,15 +64,17 @@ export async function getProjectSpace(
   client: HulyClient,
   projectIdentifier: string,
 ): Promise<string | undefined> {
-  const project = await client.findDoc(PROJECT_CLASS, projectIdentifier);
-  if (!project) return undefined;
-  // Project._id === space (T-67), cast string cho client API
-  return project.space as string;
+  const project = await client.findOne(PROJECT_CLASS, { identifier: projectIdentifier });
+  return project?._id;
 }
 
 /**
  * T-71: Resolve IssueStatus docs cho project qua ProjectType.statuses traversal.
- * Return undefined nếu project không tồn tại hoặc statuses array rỗng.
+ * Flow: Project → project.type (Ref<ProjectType>) → ProjectType.statuses
+ * (Ref<IssueStatus>[]) → resolve docs. Trả {statuses, defaultStatusId}.
+ *
+ * category Ref<StatusCategory> → enum key (strip `*:statusCategory:` prefix).
+ * isDefault = status._id === project.defaultIssueStatus.
  */
 export async function getProjectStatuses(
   client: HulyClient,
@@ -78,31 +83,59 @@ export async function getProjectStatuses(
   | { statuses: Array<{ _id: string; name: string; category: string; isDefault: boolean }> }
   | undefined
 > {
-  const project = await client.findDoc(PROJECT_CLASS, projectIdentifier);
+  const project = await client.findOne(PROJECT_CLASS, {
+    identifier: projectIdentifier,
+  } as never);
   if (!project) return undefined;
-
-  const projectType = await client.findDoc(PROJECT_TYPE_CLASS, project.type);
-  if (!projectType) return undefined;
-
-  const statusIds = projectType.statuses;
-  if (!statusIds || statusIds.length === 0) return undefined;
-
-  const statuses = await client.findDocs(STATUS_CLASS, statusIds);
-  return {
-    statuses: statuses.map((s) => ({
-      _id: s._id,
-      name: s.name,
-      category: s.category,
-      isDefault: s.isDefault ?? false,
-    })),
-  };
+  const projectTypeRef = (project as { type?: string }).type;
+  if (!projectTypeRef) return { statuses: [] };
+  const projectType = await client.findOne(PROJECT_TYPE_CLASS, { _id: projectTypeRef } as never);
+  // ProjectType.statuses = ProjectStatus[] (objects {_id: Ref<Status>, taskType, ...}),
+  // KHÔNG Ref[] — extract ._id trước (trusted issues-shared.ts:157 .map(s => s._id)).
+  const rawStatuses =
+    (projectType as { statuses?: Array<{ _id?: string }> } | null)?.statuses ?? [];
+  const statusRefs = rawStatuses
+    .map((s) => s._id)
+    .filter((r): r is string => typeof r === "string");
+  const defaultStatusId = (project as { defaultIssueStatus?: string }).defaultIssueStatus ?? "";
+  // T-81 #104: resolve statuses qua core.class.Status + batch $in (KHÔNG
+  // findOne IssueStatus per ref N+1 — trusted né: "can fail on some workspaces").
+  let statuses: Array<{ _id: string; name: string; category: string; isDefault: boolean }> = [];
+  if (statusRefs.length > 0) {
+    const statusDocs = (await client.findAll(STATUS_CLASS, {
+      _id: { $in: statusRefs },
+    } as never)) as Array<{ _id?: string; name?: string; category?: string }>;
+    statuses = statusRefs
+      .map((ref) => {
+        const s = statusDocs.find((d) => d._id === ref);
+        if (!s) return null;
+        const rawCat = s.category ?? "";
+        return {
+          _id: ref,
+          name: s.name ?? "",
+          category: rawCat.split(":").pop() ?? rawCat,
+          isDefault: ref === defaultStatusId,
+        };
+      })
+      .filter(
+        (x): x is { _id: string; name: string; category: string; isDefault: boolean } => x !== null,
+      );
+  }
+  return { statuses };
 }
 
 export function resolveIdentifier(project: string, identifier: string): string {
-  // Nếu identifier đã có dash → assume format "<PROJ>-<NUM>" → return as-is
-  if (identifier.includes("-")) return identifier;
-  // raw num → prefix với project
-  return `${project}-${identifier}`;
+  if (/^\d+$/.test(identifier)) {
+    return `${project}-${identifier}`;
+  }
+  // Check cross-project: input "FOO-5" nhưng tool scoped ở "PD"
+  const m = /^([A-Za-z]+)-(\d+)$/.exec(identifier);
+  if (m && m[1] !== project) {
+    throw new Error(
+      `Cross-project identifier not allowed: "${identifier}" (tool scoped to project "${project}")`,
+    );
+  }
+  return identifier;
 }
 
 /**
@@ -115,12 +148,16 @@ export function escapeLikePattern(s: string): string {
 
 /**
  * Parse Huly markup JSON safe — return null nếu content không phải JSON markup
- * (text, object markup, hoặc malformed JSON). Tránh JSON.parse throw khi user
- * input không phải markup (Tool output text thoải mái, markup strict).
+ * (plain text cũ HOẶC rỗng). Caller fallback về raw content.
+ *
+ * Huly content field có thể là:
+ *   - JSON markup string (mới): `'{"type":"doc",...}'`
+ *   - Plain text (cũ): `"hello"`
+ *   - Empty: `""`
  */
 export function parseMarkupSafe(content: unknown): unknown {
-  if (typeof content !== "string") return null;
-  if (!content.startsWith("{") && !content.startsWith("[")) return null;
+  if (typeof content !== "string" || content.length === 0) return null;
+  if (!content.startsWith("{")) return null;
   try {
     return JSON.parse(content);
   } catch {
@@ -160,16 +197,19 @@ function schemaDriftError(
   doc: unknown,
   missingField: "space" | "_id",
 ): HulyToolResult {
-  const docId = (doc as Doc)._id;
+  const docId =
+    typeof doc === "object" && doc !== null ? (doc as { _id?: unknown })._id : undefined;
   return {
+    content:
+      `Cannot update ${_class}: doc record missing "${missingField}" field (schema drift). ` +
+      `Update skipped to prevent silent no-op.`,
     isError: true,
-    content: [
-      {
-        type: "text",
-        text: `Schema drift: missing ${missingField} field for ${_class}${docId ? ` doc ${docId}` : ""}. Data may be corrupted or partially imported. Operation cancelled.`,
-      },
-    ],
-    details: { _class, docId, missing: missingField },
+    details: {
+      _class,
+      docId,
+      missingField,
+      ...(typeof doc === "object" && doc !== null ? { docRecord: doc } : {}),
+    },
   };
 }
 
@@ -180,20 +220,25 @@ function schemaDriftError(
 function extractDocRefs(
   doc: unknown,
 ): { space: Ref<Space>; objectId: string } | { missing: "space" | "_id" } {
-  if (doc === null || typeof doc !== "object") return { missing: "_id" };
-  const d = doc as Doc;
-
-  if (!d.space) return { missing: "space" };
-  if (!d._id) return { missing: "_id" };
-  if (typeof d.space !== "object") return { missing: "space" }; // must be Ref
-  if (typeof d._id !== "string") return { missing: "_id" };
-
-  return { space: d.space, objectId: d._id };
+  if (typeof doc !== "object" || doc === null || Array.isArray(doc)) {
+    return { missing: "space" }; // doc không hợp lệ → guard space first
+  }
+  const d = doc as { space?: unknown; _id?: unknown };
+  if (d.space === undefined || d.space === null) return { missing: "space" };
+  if (d._id === undefined || d._id === null) return { missing: "_id" };
+  return { space: d.space as Ref<Space>, objectId: d._id as string };
 }
 
 /**
  * safeUpdateDoc — updateDoc với schema drift guard.
- * Return { ok: true, result } hoặc { ok: false, error } (caller check ok → return error).
+ *
+ * @param client HulyClient đã kết nối
+ * @param _class Class ref (vd tracker:class:Issue)
+ * @param doc Doc ĐÃ LOOKUP (caller findOne trước). Helper extract .space/._id.
+ * @param operations DocumentUpdate ops
+ * @returns Discriminated union: ok → TxResult | !ok → isError result (return thẳng)
+ *
+ * Pattern T-50 (workspace.ts:155-173) centralized.
  */
 export async function safeUpdateDoc<T extends Doc>(
   client: HulyClient,
@@ -203,16 +248,24 @@ export async function safeUpdateDoc<T extends Doc>(
 ): Promise<SafeWriteOk | SafeWriteErr> {
   const refs = extractDocRefs(doc);
   if ("missing" in refs) {
-    return { ok: false, error: schemaDriftError(_class.name, doc, refs.missing) };
+    return { ok: false, error: schemaDriftError(_class as string, doc, refs.missing) };
   }
-
-  const result = await client.updateDoc(_class, refs.space, refs.objectId, operations);
+  const result = await client.updateDoc(
+    _class,
+    refs.space,
+    refs.objectId as Ref<T>,
+    operations as never,
+  );
   return { ok: true, result };
 }
 
 /**
  * safeRemoveDoc — removeDoc với schema drift guard.
- * Return { ok: true, result } hoặc { ok: false, error } (caller check ok → return error).
+ *
+ * @param client HulyClient đã kết nối
+ * @param _class Class ref
+ * @param doc Doc ĐÃ LOOKUP. Helper extract .space/._id.
+ * @returns Discriminated union: ok → TxResult | !ok → isError result
  */
 export async function safeRemoveDoc<T extends Doc>(
   client: HulyClient,
@@ -221,9 +274,8 @@ export async function safeRemoveDoc<T extends Doc>(
 ): Promise<SafeWriteOk | SafeWriteErr> {
   const refs = extractDocRefs(doc);
   if ("missing" in refs) {
-    return { ok: false, error: schemaDriftError(_class.name, doc, refs.missing) };
+    return { ok: false, error: schemaDriftError(_class as string, doc, refs.missing) };
   }
-
-  const result = await client.removeDoc(_class, refs.space, refs.objectId);
+  const result = await client.removeDoc(_class, refs.space, refs.objectId as Ref<T>);
   return { ok: true, result };
 }
