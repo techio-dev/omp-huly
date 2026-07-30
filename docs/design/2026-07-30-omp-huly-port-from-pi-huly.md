@@ -1,9 +1,10 @@
 # Design: omp-huly — port pi-huly → oh-my-pi (omp)
 
 - **Date**: 2026-07-30
-- **Status**: Draft (pending user review)
+- **Status**: Reviewed (independent subagent review applied); source synced to pi-huly `1.0.0-beta.14`.
 - **Author**: brainstorming session
 - **Scope**: retarget the `pi-huly` Huly integration from Pi (`@earendil-works/*`, typebox) to **oh-my-pi / omp** (`@oh-my-pi/*`, Zod).
+- **Source baseline**: omp-huly is a GitHub fork of `naicoi92/pi-huly`, currently synced to **`1.0.0-beta.14`** (includes the #153 `list_issues` status/component filter fix). The port starts from this baseline; `issues-core.ts` carries the fix and Task 4 converts only its schemas, leaving the fix's handler logic verbatim.
 
 ## 1. Goal
 

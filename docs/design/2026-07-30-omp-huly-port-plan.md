@@ -21,6 +21,7 @@
 - **Do not touch host-agnostic logic:** `src/client/*`, `src/markup/*`, `src/config/resolver.ts`, `src/tools/confirm.ts`, `src/tools/domains/*.ts` handler bodies, the `defineHulyTool.execute` body. Only their imports/schemas/config-paths change.
 - **Security invariant (config migration):** credentials writes stay atomic + chmod 0o600; never log token/password; legacy `~/.pi` reads honored only if chmod-600 valid.
 - **Zod import:** use `import { z } from "zod"` (resolves to zod v4 "Classic"). omp detects tool schemas by duck-typing (`_zod` + `.parse`), so direct import is canonical & compatible (verified by review).
+- **Source baseline:** omp-huly is a GitHub fork of `naicoi92/pi-huly`, synced to **pi-huly `1.0.0-beta.14`** (includes the #153 `list_issues` status/component filter fix). To pull future pi-huly hotfixes: GitHub "Sync fork" on `techio-dev/omp-huly` → `git fetch origin` → reconcile local `main` (reset to `origin/main`, re-apply any omp-huly-only commits). The `pi-huly` local-path remote is kept for ad-hoc cherry-picks.
 
 ---
 
@@ -52,7 +53,7 @@
 - Test: `pnpm run build` still succeeds (typebox still present; nothing breaks yet).
 
 **Interfaces:**
-- Produces: `name: "omp-huly"`, manifest `"omp": { "extensions": ["./dist/index.mjs"] }`, `zod@^4` in deps, `typebox` removed, peer deps `@oh-my-pi/*`, repo `techio-dev/omp-huly`.
+- Produces: `name: "omp-huly"`, `version: "0.1.0"`, manifest `"omp": { "extensions": ["./dist/index.mjs"] }`, `zod@^4` added to deps, `typebox` removed from **peerDependencies** (kept in devDependencies until Task 4), peer deps re-namespaced to `@oh-my-pi/*`, repo `techio-dev/omp-huly`.
 
 - [ ] **Step 1: Edit `package.json`**
 
@@ -82,6 +83,7 @@ Set these fields:
     "oxfmt": "^0.60.0",
     "oxlint": "^1.75.0",
     "rolldown": "^1.2.0",
+    "typebox": "^1.3.8",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   },
@@ -94,14 +96,12 @@ Set these fields:
   "omp": { "extensions": ["./dist/index.mjs"] }
 }
 ```
-Notes: remove `typebox` from both deps and peerDependencies; remove the `skills` array from the manifest; remove `./skills` from `files`. Drop the `typebox` devDep entirely.
+Notes: `typebox` currently lives in **devDependencies + peerDependencies** (NOT in deps). **Keep `"typebox": "^1.3.8"` in devDependencies** (src still uses it until Task 4); remove it from **peerDependencies only** here. Remove the `skills` array from the manifest; remove `./skills` from `files`. (Task 4 Step 5 deletes `typebox` from devDependencies once all usage is gone.) `@earendil-works/pi-ai` peer dep is also dropped — pi-huly does not import it.
 
 - [ ] **Step 2: Install + verify build still green**
 
 Run: `pnpm install && pnpm run build`
-Expected: builds `dist/index.mjs`. typebox still present in src, so it compiles (typebox remains resolvable until Task 4 removes its usage; keep it installed until then — actually we removed it from package.json in Step 1, so add it back to devDependencies TEMPORARILY until Task 4). 
-
-Correction: to keep the tree green between Task 1 and Task 4, **keep `typebox` in `devDependencies`** (not deps) until Task 4 removes all typebox usage; Task 4 Step final removes it. Apply: in Step 1, move `typebox` from deps → devDependencies (`"typebox": "^1.3.8"`), do NOT delete yet.
+Expected: builds `dist/index.mjs`. `typebox` stays in devDependencies (kept until Task 4) so src still compiles; `zod` is newly installed. Tree stays green between Task 1 and Task 4 — no interim breakage.
 
 - [ ] **Step 3: Commit**
 
@@ -114,8 +114,8 @@ git commit -m "build(omp-huly): rename package, omp manifest, add zod, re-namesp
 
 ### Task 2: Import re-namespace `@earendil-works/*` → `@oh-my-pi/*`
 
-**Files (exact, 14 files, 19 sites):**
-- Modify: `src/index.ts`, `src/commands/huly.ts`, `src/tools/builder.ts`, `src/tools/confirm.ts`, `src/tools/register.ts`, `src/render/document.ts`, `src/render/issue.ts`, `src/render/util.ts`, `src/__tests__/e2e-live-domains.test.ts`, `src/__tests__/e2e-live-hunt3.test.ts`, `src/__tests__/e2e-live.test.ts`, `src/__tests__/e2e-smoke.test.ts`, `src/render/__tests__/document.test.ts`, `src/render/__tests__/issue.test.ts`
+**Files (exact, 15 files, 19 sites):**
+- Modify: `src/index.ts`, `src/commands/huly.ts`, `src/tools/builder.ts`, `src/tools/confirm.ts`, `src/tools/register.ts`, `src/render/document.ts`, `src/render/issue.ts`, `src/render/util.ts`, `src/__tests__/e2e-live-domains.test.ts`, `src/__tests__/e2e-live-hunt3.test.ts`, `src/__tests__/e2e-live-hunt4.test.ts`, `src/__tests__/e2e-live.test.ts`, `src/__tests__/e2e-smoke.test.ts`, `src/render/__tests__/document.test.ts`, `src/render/__tests__/issue.test.ts`
 
 **Interfaces:**
 - Consumes: omp packages `@oh-my-pi/pi-coding-agent`, `@oh-my-pi/pi-tui` must export `ExtensionAPI`, `ExtensionContext`, `ExtensionCommandContext`, `AgentToolResult`, `ToolRenderResultOptions`, `Component`, `Text`.
@@ -123,7 +123,7 @@ git commit -m "build(omp-huly): rename package, omp manifest, add zod, re-namesp
 
 - [ ] **Step 1: Replace scopes mechanically**
 
-Replace every `@earendil-works/pi-coding-agent` → `@oh-my-pi/pi-coding-agent` and `@earendil-works/pi-tui` → `@oh-my-pi/pi-tui` across the 14 files above. (A scoped sed is fine here — these are import specifiers, not code identifiers.)
+Replace every `@earendil-works/pi-coding-agent` → `@oh-my-pi/pi-coding-agent` and `@earendil-works/pi-tui` → `@oh-my-pi/pi-tui` across the 15 files above. (A scoped sed is fine here — these are import specifiers, not code identifiers.) `e2e-live-hunt4.test.ts` is new in beta.14 and also imports `ExtensionContext` — include it.
 
 - [ ] **Step 2: Install omp peer deps for typecheck**
 
@@ -354,11 +354,11 @@ Check both for typebox usage (`grep "Type\.\|TObject\|from \"typebox\"" src/tool
 
 Apply the rule table to all `Type.*` schemas (`workspaceParam`, `projectParam`, `limitParam`, `identifierParam`, `prioritySchema`, `statusCategorySchema`, `baseParams()`, `projectParams()`). Drop typebox type-only imports. Keep all non-schema helpers (`resolveIdentifier`, `escapeLikePattern`, `safeUpdateDoc`, etc.) untouched.
 
-- [ ] **Step 4: Convert the 20 domain files**
+- [ ] **Step 4: Convert the 21 domain files**
 
-For each of the 20 domain files listed above, apply the rule table to every `Type.*` call inside `defineHulyTool({ parameters: Type.Object({...}), ... })`. Do NOT touch handler bodies, imports of `_class-refs`/`_entity-types`/`_common` consts, or `defineHulyTool` options other than `parameters`.
+For each of the 21 domain files listed above, apply the rule table to every `Type.*` call inside `defineHulyTool({ parameters: Type.Object({...}), ... })`. Do NOT touch handler bodies (incl. the beta.14 #153 `list_issues` status/component filter resolution logic in `issues-core.ts` — host-agnostic, stays verbatim), imports of `_class-refs`/`_entity-types`/`_common` consts, or `defineHulyTool` options other than `parameters`. (`_class-refs.ts` and `_entity-types.ts` hold no typebox schemas — verify-only.)
 
-**Also convert typebox usage in tests:** `grep -rln 'from "typebox"\|Type\.' src/**/__tests__` and convert every match — notably `src/tools/__tests__/builder.test.ts` builds `Type.Object({...})` schemas fed into `defineHulyTool`, which would fail the `P extends z.ZodObject<z.ZodRawShape>` constraint after migration. Tests assert tool *behavior*, not schema shapes, so assertions stay valid; only schema construction changes.
+**Also convert typebox usage in tests:** `grep -rln 'from "typebox"' src/**/__tests__` and convert every match — notably `src/tools/__tests__/builder.test.ts` and `src/__tests__/e2e-live-hunt4.test.ts` (new in beta.14), both of which build `Type.Object({...})` schemas that would fail the `P extends z.ZodObject<z.ZodRawShape>` constraint after migration. (Grep on `from "typebox"` only — `Type.` also matches the word "Type." in comments, e.g. `_class-refs.ts`.) Tests assert tool *behavior*, not schema shapes, so assertions stay valid; only schema construction changes.
 
 - [ ] **Step 5: Remove `typebox` from devDependencies**
 
@@ -479,7 +479,7 @@ The skills live outside the repo, so commit a note in `CHANGELOG.md` (Task 7 cov
 Add entry at top:
 ```
 ## [0.1.0] — 2026-07-30
-- Fork from pi-huly; retarget to oh-my-pi (omp).
+- Fork from pi-huly `1.0.0-beta.14` (includes #153 `list_issues` filter fix); retarget to oh-my-pi (omp).
 - Schema system: typebox -> Zod.
 - Imports: @earendil-works/* -> @oh-my-pi/*.
 - Config store: ~/.omp/agent/huly/ (+ legacy ~/.pi auto-migration).
