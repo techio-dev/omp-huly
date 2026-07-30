@@ -26,7 +26,7 @@ import {
 } from "../config/resolver.js";
 import { confirmDestructive, type ConfirmContext } from "./confirm.js";
 
-/** Tool parameter schema phải là TObject (Type.Object) cho LLM-callable. */
+/** Tool parameter schema phải là ZodObject (z.object) cho LLM-callable. */
 export type ToolParams = z.ZodObject<z.ZodRawShape>;
 
 /** Error class identifier (re-export từ errors.ts — single source). */
@@ -100,7 +100,7 @@ export interface DefineHulyToolOptions<P extends ToolParams = ToolParams, TDetai
   promptSnippet?: string;
   /** Optional guideline bullets appended to system prompt. */
   promptGuidelines?: string[];
-  /** Parameter schema (typebox Type.Object). */
+  /** Parameter schema (Zod z.object). */
   parameters: P;
   /** Handler thuần — nhận resolved binding, return HulyToolResult. */
   handler: (params: z.infer<P>, toolCtx: HulyToolContext) => Promise<HulyToolResult<TDetails>>;

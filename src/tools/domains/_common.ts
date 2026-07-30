@@ -1,4 +1,4 @@
-// Common typebox schemas cho domain tools — tránh lặp.
+// Common Zod schemas cho domain tools — tránh lặp.
 // 06-api.md §2 Common Parameters Convention.
 
 import { z } from "zod";

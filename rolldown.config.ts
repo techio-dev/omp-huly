@@ -2,7 +2,7 @@ import { defineConfig } from "rolldown";
 
 // R3 mitigation: externalize ws + native addons (R2), node:* built-ins,
 // omp peers (@oh-my-pi/*), @hcengineering/* (npm public dep — consumer
-// install runtime, KHÔNG bundled) and typebox (until Task 4 removes it).
+// install runtime, KHÔNG bundled)
 // KHÔNG inline → bundle stays small, no dep leak.
 const external = [
   "ws",
@@ -11,7 +11,6 @@ const external = [
   /^node:/,
   /^@oh-my-pi\//,
   /^@hcengineering\//,
-  "typebox",
 ];
 
 export default defineConfig({

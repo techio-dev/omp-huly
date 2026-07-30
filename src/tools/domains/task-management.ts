@@ -259,13 +259,7 @@ export const tools: HulyToolDefinition[] = [
       workspace: workspaceParam,
       taskType: z.string().describe("TaskType _id (resolve statusClass + register)."),
       name: z.string(),
-      category: z.union([
-        z.literal("UnStarted"),
-        z.literal("ToDo"),
-        z.literal("Active"),
-        z.literal("Won"),
-        z.literal("Lost"),
-      ]),
+      category: z.enum(["UnStarted", "ToDo", "Active", "Won", "Lost"]),
     }),
     async handler(params, tctx) {
       // T-73: resolve taskType → statusClass + parent projectType. T-90: native TaskTypeDoc.

@@ -29,13 +29,7 @@ const TODO_PRIORITY_MAP: Record<string, number> = {
 
 /** Priority param schema (string → number enum mapping). */
 const todoPrioritySchema = z.optional(
-  z.union([
-    z.literal("urgent"),
-    z.literal("high"),
-    z.literal("medium"),
-    z.literal("low"),
-    z.literal("no-priority"),
-  ]),
+  z.enum(["urgent", "high", "medium", "low", "no-priority"]),
 );
 
 export const tools: HulyToolDefinition[] = [
@@ -223,7 +217,7 @@ export const tools: HulyToolDefinition[] = [
       owner: z.optional(z.string().describe("Owner email/name.")),
       priority: todoPrioritySchema,
       visibility: z.optional(
-        z.union([z.literal("public"), z.literal("freeBusy"), z.literal("private")]),
+        z.enum(["public", "freeBusy", "private"]),
       ),
       // T-79G #106: dueDate=null → \$unset clear.
       dueDate: z.optional(z.union([z.number().int(), z.null()])),
