@@ -8,44 +8,45 @@
 // getCurrentUser() wrap client.getAccount() (D15 FR-18 default assignee).
 // Error mapping: delegate sang T-04 HulyError qua mapError.
 
-import {
-  connect,
-  connectRest,
-  connectStorage,
-  createRestTxOperations,
-  getWorkspaceToken,
-  type Account,
-  type ConnectOptions,
-  type AttachedData,
-  type AttachedDoc,
-  type Class,
-  type Doc,
-  type DocumentQuery,
-  type DocumentUpdate,
-  type FindOptions,
-  type FindResult,
-  type Mixin,
-  type MixinData,
-  type PlatformClient,
-  type Ref,
-  type RestClient,
-  type Space,
-  type StorageClient,
-  type TxOperations,
-  type TxResult,
-  type WithLookup,
-  type WithMarkup,
+// CJS interop: @hcengineering/* ship CommonJS (dynamic __reExport loop) → named
+// ESM imports crash at runtime ("Named export 'connect' not found"). Default
+// import = module.exports, destructure for values. Types stay type-only.
+import apiClient from "@hcengineering/api-client";
+import type {
+  Account,
+  ConnectOptions,
+  AttachedData,
+  AttachedDoc,
+  Class,
+  Doc,
+  DocumentQuery,
+  DocumentUpdate,
+  FindOptions,
+  FindResult,
+  Mixin,
+  MixinData,
+  PlatformClient,
+  Ref,
+  RestClient,
+  Space,
+  StorageClient,
+  TxOperations,
+  TxResult,
+  WithLookup,
+  WithMarkup,
 } from "@hcengineering/api-client";
 // T-103 #156: makeCollabId (core) + jsonToMarkup (text-core) exist runtime nhưng
-// KHÔNG trong .d.ts — namespace import + cast (updateMarkup conversion).
-import * as coreNs from "@hcengineering/core";
-import * as textCoreNs from "@hcengineering/text-core";
-import { markdownToMarkup } from "@hcengineering/text-markdown";
+// KHÔNG trong .d.ts — default import + cast (updateMarkup conversion).
+import core from "@hcengineering/core";
+import textCore from "@hcengineering/text-core";
+import textMarkdown from "@hcengineering/text-markdown";
+const { connect, connectRest, connectStorage, createRestTxOperations, getWorkspaceToken } =
+  apiClient;
+const { markdownToMarkup } = textMarkdown;
 const makeCollabId = (
-  coreNs as unknown as { makeCollabId: (c: string, i: string, a: string) => unknown }
+  core as unknown as { makeCollabId: (c: string, i: string, a: string) => unknown }
 ).makeCollabId;
-const jsonToMarkup = (textCoreNs as unknown as { jsonToMarkup: (j: unknown) => string })
-  .jsonToMarkup;
+const jsonToMarkup = (textCore as unknown as { jsonToMarkup: (j: unknown) => string }).jsonToMarkup;
 import { mapError } from "./errors.js";
 import { DEFAULT_UPSTREAM_NOISE_PATTERNS, runWithConsoleFilter } from "./console-filter.js";
 import { loadConfig } from "../config/config.js";

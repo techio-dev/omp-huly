@@ -3,6 +3,31 @@
 All notable changes to omp-huly sẽ document ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/),
 versioning theo [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] — 2026-07-31
+
+**Hotfix sync pi-huly `1.0.0-beta.18` — fix ESM/CJS interop crash (#162, CRITICAL).**
+Bản fix quan trọng nhất: bug đã chặn omp-huly load hoàn toàn kể từ đầu. Named ESM imports
+từ `@hcengineering/*` (CommonJS, dynamic `__reExport` loop) crash lúc load:
+"Named export 'connect' not found" — `cjs-module-lexer` không detect exports sau
+`require()`+`__copyProps` loop. `connect`/`markdownToMarkup`/`makeCollabId`/`jsonToMarkup`
+đều `undefined` runtime. Fix: default import + destructure (types giữ `import type`).
+
+### Fixed
+
+- **CJS interop crash (#162, CRITICAL)**: `src/client/client.ts` + `src/markup/markup.ts`
+  đổi named value imports → default import + destructure (`import apiClient from
+  "@hcengineering/api-client"; const { connect, ... } = apiClient`). Namespace imports
+  (`coreNs.makeCollabId` = `undefined`) cũng fix qua default import. `client.test.ts` mock
+  thêm `default` export.
+
+### Verify runtime (smoke-load)
+
+- dist smoke-load: default import `@hcengineering/api-client` resolve OK (KHÔNG còn
+  "Named export not found"). `connect`/`connectRest`/`getWorkspaceToken`/`markdownToMarkup`/
+  `core.makeCollabId`/`textCore.jsonToMarkup` đều `function` (callable, không undefined).
+- Lưu ý: standalone load vẫn fail ở `@oh-my-pi/pi-tui` (peer dep ship `.ts` source — Node
+  không strip types trong node_modules) → concern loader riêng, KHÔNG phải bug CJS này.
+
 ## [0.2.1] — 2026-07-30
 
 **Hotfix sync pi-huly `1.0.0-beta.17` (description persistence + todo priority map).**
