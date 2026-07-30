@@ -57,6 +57,7 @@ function makeClient() {
     removeDoc: vi.fn().mockResolvedValue(undefined),
     addCollection: vi.fn().mockResolvedValue("new-todo-id"),
     uploadMarkup: vi.fn().mockResolvedValue({ type: "blob", blobId: "b1" }),
+    updateMarkup: vi.fn().mockResolvedValue(undefined),
     createMixin: vi.fn(),
     fetchMarkup: vi.fn(),
     getAccount: vi.fn(),
@@ -322,7 +323,7 @@ describe("T-79: get_todo doneOn field (#102)", () => {
       done: true,
       owner: "emp-1",
       dueDate: 1800000000000,
-      priority: 0,
+      priority: "no-priority", // T-103 #164: numeric 0 → label
     });
   });
 
@@ -418,5 +419,91 @@ describe("T-79: delete_todo ProjectToDo class + counter dec (#102)", () => {
 
     expect(client.removeDoc).toHaveBeenCalledWith("time:class:ToDo", "time-space", "t9");
     expect(client.updateDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe("T-103 #162: update_todo description uploadMarkup + ops.description", () => {
+  it("description → uploadMarkup ref + ops.description (mirror update_issue)", async () => {
+    const client = makeClient();
+    client.findOne = vi.fn().mockResolvedValue({ _id: "t1", space: "sp1" });
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_update_todo");
+    const result = await tool.execute(
+      "tc1",
+      { todo: "t1", description: "new desc text" },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    expect(result.isError).toBeUndefined();
+    // #162: uploadMarkup (createContent rpc) creates new blob + swap ref via updateDoc.
+    // updateMarkup (updateContent) chỉ EDIT existing blob — fail khi todo chưa có desc.
+    expect(client.uploadMarkup).toHaveBeenCalledWith(
+      "time:class:ToDo",
+      "t1",
+      "description",
+      "new desc text",
+      "markdown",
+    );
+    expect(client.updateMarkup).not.toHaveBeenCalled();
+    // description vào ops → updateDoc gọi (KHÔNG in-place markup-only).
+    const ops = client.updateDoc.mock.calls[0]?.[3] as { description?: unknown } | undefined;
+    expect(ops?.description).toEqual({
+      type: "blob",
+      blobId: "b1",
+    });
+    expect((result.details as { fields: string[] }).fields).toContain("description");
+  });
+
+  it("title + priority + visibility → updateDoc ops (non-markup fields)", async () => {
+    const client = makeClient();
+    client.findOne = vi.fn().mockResolvedValue({ _id: "t1", space: "sp1" });
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_update_todo");
+    await tool.execute(
+      "tc1",
+      { todo: "t1", title: "Renamed", priority: "high", visibility: "private" },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    const call = client.updateDoc.mock.calls[0];
+    expect(call?.[3]).toMatchObject({
+      title: "Renamed",
+      priority: 3, // TODO_PRIORITY_MAP["high"] (#164: high=3, KHÔNG 0)
+      visibility: "Private",
+    });
+  });
+
+  it("dueDate=null → $unset clear", async () => {
+    const client = makeClient();
+    client.findOne = vi.fn().mockResolvedValue({ _id: "t1", space: "sp1" });
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_update_todo");
+    await tool.execute("tc1", { todo: "t1", dueDate: null }, undefined, undefined, ctx);
+
+    const call = client.updateDoc.mock.calls[0];
+    expect(call?.[3]).toEqual({ $unset: { dueDate: "" } });
+  });
+});
+
+describe("T-103 #160: create_todo title guard (non-empty)", () => {
+  it("empty title → isError, addCollection KHÔNG gọi", async () => {
+    const client = makeClient();
+    vi.mocked(getClient).mockResolvedValue(client as never);
+    const r = await findTool("huly_create_todo").execute(
+      "t1",
+      { title: "", identifier: "PD-1" },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(r.isError).toBe(true);
+    expect(client.addCollection).not.toHaveBeenCalled();
   });
 });

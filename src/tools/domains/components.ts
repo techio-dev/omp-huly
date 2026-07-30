@@ -127,6 +127,14 @@ export const tools: HulyToolDefinition[] = [
       lead: z.optional(z.string().describe("Lead email/name.")),
     }),
     async handler(params, tctx) {
+      // T-103 #160: guard label non-empty.
+      if (params.label.trim() === "") {
+        return {
+          content: `create_component label must be non-empty.`,
+          isError: true,
+          details: { label: params.label },
+        };
+      }
       const project = await tctx.client.findOne(PROJECT_CLASS, {
         identifier: tctx.project,
       });
@@ -156,12 +164,31 @@ export const tools: HulyToolDefinition[] = [
       // project.space (T-67 assumption project._id===project.space SAI cho ws này
       // → component orphan, set_issue_component scope issue.space=project._id
       // không thấy). Đồng bộ list/get/update/set/delete (dùng getProjectSpace).
-      const id = await tctx.client.createDoc(COMPONENT_CLASS, project._id as never, {
-        label: params.label,
-        description: params.description,
-        lead: leadRef,
-        comments: 0,
-      });
+      // T-103 #162: description = MarkupBlobRef. Pre-gen id → uploadMarkup ref
+      // (mirror create_issue/create_document). Trước đây push raw string →
+      // get_component fetchMarkup đọc garbage → description undefined.
+      const compId = `${COMPONENT_CLASS as string}.${Math.random().toString(36).slice(2, 12)}`;
+      let descriptionRef: unknown = null;
+      if (params.description && params.description.trim() !== "") {
+        descriptionRef = await tctx.client.uploadMarkup(
+          COMPONENT_CLASS,
+          compId,
+          "description",
+          params.description,
+          "markdown",
+        );
+      }
+      const id = await tctx.client.createDoc(
+        COMPONENT_CLASS,
+        project._id as never,
+        {
+          label: params.label,
+          description: descriptionRef,
+          lead: leadRef,
+          comments: 0,
+        },
+        compId as never,
+      );
       return {
         content: `Created component "${params.label}".`,
         details: { id, label: params.label },
@@ -205,8 +232,26 @@ export const tools: HulyToolDefinition[] = [
         };
       }
       const ops: Record<string, unknown> = {};
-      if (params.label !== undefined) ops.label = params.label;
-      if (params.description !== undefined) ops.description = params.description;
+      if (params.label !== undefined) {
+        if (params.label.trim() === "")
+          return {
+            content: "label must be non-empty.",
+            isError: true,
+            details: { label: params.label },
+          };
+        ops.label = params.label;
+      }
+      // T-103 #162: description = MarkupBlobRef → uploadMarkup ref (mirror update_issue).
+      if (params.description !== undefined) {
+        const ref = await tctx.client.uploadMarkup(
+          COMPONENT_CLASS,
+          c._id,
+          "description",
+          params.description,
+          "markdown",
+        );
+        ops.description = ref;
+      }
       // T-81 #104: lead = Ref<Employee> (resolve Person, KHÔNG raw string).
       if (params.lead !== undefined) {
         const leadRef = await findPersonByEmailOrName(tctx.client, params.lead);

@@ -57,15 +57,11 @@ export const tools: HulyToolDefinition[] = [
       workspace: workspaceParam,
       project: projectParam,
       status: z.optional(
-        z.string().describe(
-          "IssueStatus name or _id (resolved → Ref). See huly_list_statuses.",
-        ),
+        z.string().describe("IssueStatus name or _id (resolved → Ref). See huly_list_statuses."),
       ),
       statusCategory: statusCategorySchema,
       assignee: z.optional(z.string()),
-      component: z.optional(
-        z.string().describe("Component label or _id (resolved → Ref)."),
-      ),
+      component: z.optional(z.string().describe("Component label or _id (resolved → Ref).")),
       parentIssue: z.optional(z.string()),
       titleSearch: z.optional(z.string()),
       limit: z.optional(z.number().int().min(1)),
@@ -328,6 +324,15 @@ export const tools: HulyToolDefinition[] = [
       estimation: z.optional(z.number().int()),
     }),
     async handler(params, tctx) {
+      // T-103 #159: guard title non-empty (trim). Empty/whitespace title = garbage
+      // issue (no subject). Schema lacks minLength; server accepts empty.
+      if (params.title.trim() === "") {
+        return {
+          content: `create_issue title must be non-empty (got "${params.title}"). An issue needs a subject.`,
+          isError: true,
+          details: { title: params.title },
+        };
+      }
       const project = await tctx.client.findOne(PROJECT_CLASS, {
         identifier: tctx.project,
       });
@@ -479,9 +484,11 @@ export const tools: HulyToolDefinition[] = [
       priority: prioritySchema,
       assignee: z.optional(z.union([z.string(), z.null()])),
       status: z.optional(
-        z.string().describe(
-          "Exact IssueStatus name (case-sensitive) or _id ref. Run huly_list_statuses for valid names.",
-        ),
+        z
+          .string()
+          .describe(
+            "Exact IssueStatus name (case-sensitive) or _id ref. Run huly_list_statuses for valid names.",
+          ),
       ),
       dueDate: z.optional(z.number().int()),
       estimation: z.optional(z.number().int()),
@@ -498,7 +505,15 @@ export const tools: HulyToolDefinition[] = [
         };
       }
       const ops: Record<string, unknown> = {};
-      if (params.title !== undefined) ops.title = params.title;
+      if (params.title !== undefined) {
+        if (params.title.trim() === "")
+          return {
+            content: "title must be non-empty.",
+            isError: true,
+            details: { title: params.title },
+          };
+        ops.title = params.title;
+      }
       // T-72 #80: description = MarkupBlobRef. Library KHÔNG có updateMarkup —
       // luôn uploadMarkup (new version) + ops.description = ref.
       if (params.description !== undefined) {
@@ -659,9 +674,7 @@ export const tools: HulyToolDefinition[] = [
       project: projectParam,
       identifier: identifierParam,
       parentIssue: z.optional(
-        z.string().describe(
-          "New parent issue identifier. KHÔNG truyền = top-level promotion.",
-        ),
+        z.string().describe("New parent issue identifier. KHÔNG truyền = top-level promotion."),
       ),
     }),
     async handler(params, tctx) {

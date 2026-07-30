@@ -125,10 +125,19 @@ describe("huly_update_user_profile", () => {
     expect(result.details).toEqual({ updated: false });
   });
 
+  // T-103 #157: Person resolve qua `personUuid` field (= currentUser.id =
+  // account.uuid). Lookup-by-_id fail (Person._id generated, KHÔNG uuid).
+  function mockPersonResolve(
+    client: ReturnType<typeof makeClient>,
+    person: Record<string, unknown>,
+  ) {
+    client.findOne = vi.fn().mockResolvedValue(person);
+  }
+
   // T-50 #40 + T-82 #105: firstName/lastName → formatName "Last,First".
   it('firstName + lastName → updateDoc với name dạng "Last,First"', async () => {
     const client = makeClient();
-    client.findOne = vi.fn().mockResolvedValue({ _id: "u1", space: "ws1-person-space" });
+    mockPersonResolve(client, { _id: "person-1", space: "ws1-person-space" });
     vi.mocked(getClient).mockResolvedValueOnce(client as never);
     const tool = tools.find((t) => t.name === "huly_update_user_profile")!;
     const result = await tool.execute(
@@ -139,11 +148,12 @@ describe("huly_update_user_profile", () => {
       ctx,
     );
 
-    expect(client.findOne).toHaveBeenCalledWith("contact:class:Person", { _id: "u1" });
+    // #157: resolve Person by personUuid (= currentUser.id), KHÔNG _id.
+    expect(client.findOne).toHaveBeenCalledWith("contact:class:Person", { personUuid: "u1" });
     expect(client.updateDoc).toHaveBeenCalledWith(
       "contact:class:Person",
       "ws1-person-space",
-      "u1",
+      "person-1",
       { name: "Doe,Jane" },
     );
     expect(result.details).toMatchObject({ updated: true, name: "Doe,Jane" });
@@ -151,9 +161,7 @@ describe("huly_update_user_profile", () => {
 
   it("firstName only (partial) → parse current name, giữ lastName cũ", async () => {
     const client = makeClient();
-    client.findOne = vi
-      .fn()
-      .mockResolvedValue({ _id: "u1", space: "ws1-person-space", name: "Smith,John" });
+    mockPersonResolve(client, { _id: "person-1", space: "ws1-person-space", name: "Smith,John" });
     vi.mocked(getClient).mockResolvedValueOnce(client as never);
     const tool = tools.find((t) => t.name === "huly_update_user_profile")!;
     await tool.execute("tc1", { firstName: "Johnny" }, undefined, undefined, ctx);
@@ -161,33 +169,27 @@ describe("huly_update_user_profile", () => {
     expect(client.updateDoc).toHaveBeenCalledWith(
       "contact:class:Person",
       "ws1-person-space",
-      "u1",
+      "person-1",
       { name: "Smith,Johnny" },
     );
   });
 
-  // T-50 #40: Person không tìm thấy → isError rõ ràng, KHÔNG âm thầm gửi
-  // TxUpdateDoc sai (space sai → server skip → update KHÔNG persist silently).
-  it("Person not found → isError, updateDoc KHÔNG gọi", async () => {
+  // #157: Person không có personUuid match → isError.
+  it("Person not found (personUuid) → isError, updateDoc KHÔNG gọi", async () => {
     const client = makeClient();
-    client.findOne = vi.fn().mockResolvedValue(undefined); // Person not found
+    client.findOne = vi.fn().mockResolvedValue(undefined); // Channel not found
     vi.mocked(getClient).mockResolvedValueOnce(client as never);
     const tool = tools.find((t) => t.name === "huly_update_user_profile")!;
     const result = await tool.execute("tc1", { firstName: "Jane" }, undefined, undefined, ctx);
 
     expect(result.isError).toBe(true);
-    const details = result.details as { userId?: string };
-    expect(details.userId).toBe("u1");
-    // updateDoc KHÔNG gọi (validate failed)
     expect(client.updateDoc).not.toHaveBeenCalled();
   });
 
-  // T-50 review fix: Person record tồn tại nhưng space/_id missing (schema
-  // drift) → isError, KHÔNG gửi updateDoc với undefined (silent no-op lại).
+  // T-50 review fix: Person record tồn tại nhưng space missing (schema drift) → isError.
   it("Person record missing space field (schema drift) → isError, updateDoc KHÔNG gọi", async () => {
     const client = makeClient();
-    // Person có _id nhưng KHÔNG có space field
-    client.findOne = vi.fn().mockResolvedValue({ _id: "u1" /* space missing */ });
+    mockPersonResolve(client, { _id: "person-1" /* space missing */ });
     vi.mocked(getClient).mockResolvedValueOnce(client as never);
     const tool = tools.find((t) => t.name === "huly_update_user_profile")!;
     const result = await tool.execute("tc1", { firstName: "Jane" }, undefined, undefined, ctx);

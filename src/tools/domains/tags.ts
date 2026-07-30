@@ -69,6 +69,14 @@ export const tools: HulyToolDefinition[] = [
       color: z.optional(z.string()),
     }),
     async handler(params, tctx) {
+      // T-103 #160: guard title non-empty.
+      if (params.title.trim() === "") {
+        return {
+          content: `create_tag title must be non-empty.`,
+          isError: true,
+          details: { title: params.title },
+        };
+      }
       // T-93 (#139): tạo trong PROJECT space (project._id self-ref qua
       // getProjectSpace), KHÔNG spaceRef(tctx.workspace) (workspace-handle string
       // → tag orphan, list/attach không thấy). File header: tags PROJECT-SCOPED.
@@ -114,7 +122,15 @@ export const tools: HulyToolDefinition[] = [
         };
       }
       const ops: Record<string, unknown> = {};
-      if (params.title !== undefined) ops.title = params.title;
+      if (params.title !== undefined) {
+        if (params.title.trim() === "")
+          return {
+            content: "title must be non-empty.",
+            isError: true,
+            details: { title: params.title },
+          };
+        ops.title = params.title;
+      }
       if (params.color !== undefined) ops.color = params.color;
       if (Object.keys(ops).length === 0) {
         return { content: "No fields to update.", details: { updated: false } };

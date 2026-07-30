@@ -264,3 +264,19 @@ describe("T-63 #68: schema drift guard via safeUpdateDoc/safeRemoveDoc", () => {
     expect(client.removeDoc).not.toHaveBeenCalled();
   });
 });
+
+describe("T-103 #160: create_tag title guard (non-empty)", () => {
+  it("empty title → isError, createDoc KHÔNG gọi", async () => {
+    const client = makeClient();
+    vi.mocked(getClient).mockResolvedValue(client as never);
+    const r = await findTool("huly_create_tag").execute(
+      "t1",
+      { title: "" },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(r.isError).toBe(true);
+    expect(client.createDoc).not.toHaveBeenCalled();
+  });
+});

@@ -1084,3 +1084,30 @@ describe("T-102 #153: list_issues status + component filter resolve", () => {
     expect(client.findAll).not.toHaveBeenCalled();
   });
 });
+
+describe("T-103 #159: create_issue title guard (non-empty)", () => {
+  it("empty title → isError, addCollection KHÔNG gọi", async () => {
+    const client = makeClient();
+    vi.mocked(getClient).mockResolvedValue(client as never);
+    const tool = findTool("huly_create_issue");
+    const r = await tool.execute("t1", { title: "", priority: "low" }, undefined, undefined, ctx);
+    expect(r.isError).toBe(true);
+    expect(String(r.content[0]?.text ?? "")).toMatch(/non-empty/);
+    expect(client.addCollection).not.toHaveBeenCalled();
+  });
+
+  it("whitespace-only title → isError", async () => {
+    const client = makeClient();
+    vi.mocked(getClient).mockResolvedValue(client as never);
+    const tool = findTool("huly_create_issue");
+    const r = await tool.execute(
+      "t1",
+      { title: "   ", priority: "low" },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(r.isError).toBe(true);
+    expect(client.addCollection).not.toHaveBeenCalled();
+  });
+});

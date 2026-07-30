@@ -3,6 +3,93 @@
 All notable changes to omp-huly sẽ document ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/),
 versioning theo [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] — 2026-07-31
+
+**Hotfix sync pi-huly `1.0.0-beta.18` — fix ESM/CJS interop crash (#162, CRITICAL).**
+Bản fix quan trọng nhất: bug đã chặn omp-huly load hoàn toàn kể từ đầu. Named ESM imports
+từ `@hcengineering/*` (CommonJS, dynamic `__reExport` loop) crash lúc load:
+"Named export 'connect' not found" — `cjs-module-lexer` không detect exports sau
+`require()`+`__copyProps` loop. `connect`/`markdownToMarkup`/`makeCollabId`/`jsonToMarkup`
+đều `undefined` runtime. Fix: default import + destructure (types giữ `import type`).
+
+### Fixed
+
+- **CJS interop crash (#162, CRITICAL)**: `src/client/client.ts` + `src/markup/markup.ts`
+  đổi named value imports → default import + destructure (`import apiClient from
+  "@hcengineering/api-client"; const { connect, ... } = apiClient`). Namespace imports
+  (`coreNs.makeCollabId` = `undefined`) cũng fix qua default import. `client.test.ts` mock
+  thêm `default` export.
+
+### Verify runtime (smoke-load)
+
+- dist smoke-load: default import `@hcengineering/api-client` resolve OK (KHÔNG còn
+  "Named export not found"). `connect`/`connectRest`/`getWorkspaceToken`/`markdownToMarkup`/
+  `core.makeCollabId`/`textCore.jsonToMarkup` đều `function` (callable, không undefined).
+- Lưu ý: standalone load vẫn fail ở `@oh-my-pi/pi-tui` (peer dep ship `.ts` source — Node
+  không strip types trong node_modules) → concern loader riêng, KHÔNG phải bug CJS này.
+
+## [0.2.1] — 2026-07-30
+
+**Hotfix sync pi-huly `1.0.0-beta.17` (description persistence + todo priority map).**
+Port ngữ nghĩa 2 fix HIGH. Lưu ý: #160 **revert một phần beta.16** (update_todo description
+từ `updateMarkup` về `uploadMarkup` ref — updateMarkup chỉ edit blob existing, fail khi todo
+chưa có description). **689 tests pass** + 91 e2e-live skip, typecheck/lint/fmt green.
+
+### Fixed
+
+- **description persistence (component/milestone/todo)** (#160, HIGH): create/update component
+  + milestone push RAW STRING vào MarkupBlobRef description → garbage, get reads undefined.
+  Fix: pre-gen id → `uploadMarkup` ref (mirror create/update_issue). update_todo description
+  revert `updateMarkup`→`uploadMarkup` ref (R11 proven persist). get_todo +`fetchMarkup` render.
+- **TODO_PRIORITY_MAP inverted** (#161, HIGH): map `high:0, no-priority:3` (4/5 sai) → 'high'
+  lưu 0=None, 'no-priority' lưu 3=High. Fix canonical Huly Priority: 0=None, 1=Low, 2=Medium,
+  3=High, 4=Urgent (ascending severity) + reverse-label `TODO_PRIORITY_LABELS` render trong get_todo.
+
+### Tests
+
+- Port pi-huly beta.17 unit test changes (components/milestones/todos/t79g — uploadMarkup→ref
+  path + priority map assertions).
+- Port e2e-live-hunt8 (re-namespaced @earendil→@oh-my-pi).
+
+## [0.2.0] — 2026-07-30
+
+**Sync upstream pi-huly `1.0.0-beta.15` → `1.0.0-beta.16` (markup persistence + input-validation hardening).**
+Port ngữ nghĩa 9 fix (adapt sang Zod + namespace @oh-my-pi, KHÔNG merge thô — omp đã
+typebox→Zod). Builder cast `as z.infer` KHÔNG parse runtime → guard imperative (parity
+pi-huly). **689 tests pass** + 78 e2e-live skip (gated), typecheck/lint/fmt green.
+
+### Added
+
+- `HulyClient.updateMarkup` (optional) — WS impl (collaborator.updateMarkup / updateContent
+  rpc) + REST throwing stub. Edit existing document/todo content in-place.
+
+### Fixed
+
+- **create_issue_from_template crash (AttachedDoc)** (#155, HIGH): `createDoc(ISSUE_CLASS)`
+  crash 'cannot be used for objects inherited from AttachedDoc'. Mirror `create_issue`:
+  `$inc` sequence → identifier → `addCollection` ('subIssues' collection) + full field set.
+- **edit_document silent no-persist** (#156, HIGH): `saveContent` uploadMarkup (createContent)
+  chỉ tạo INITIAL version, KHÔNG persist → dùng `updateMarkup` (updateContent rpc).
+- **update_todo description no-persist** (#106): description via `updateMarkup` in-place
+  (mirror #156); `descUpdated` flag, conditional `safeUpdateDoc`.
+- **update_user_profile wrong Person** (#157): lookup-by-_id fail (Person._id ≠ uuid) →
+  `personUuid` field (canonical account→Person link). + `accountToUser` extract real email
+  từ `fullSocialIds[email]` (primarySocialId có thể là numeric id, KHÔNG email).
+- **log_time non-positive** (#158, MED): value 0/negative accepted → time corruption.
+  Handler guard `value > 0`.
+- **create_issue empty title** (#159): whitespace title = garbage issue. Guard `trim()`.
+- **create tools empty title/label — SYSTEMIC** (#160): create_todo / create_milestone /
+  create_component / create_tag / create_template cùng bug class. Uniform empty-guard.
+- **update tools empty title/label — SYSTEMIC** (#161): update_issue / update_component /
+  update_milestone / update_todo / update_template / update_tag rename → ''. Uniform guard.
+
+### Tests
+
+- Port pi-huly unit guard tests (components / issues-core / milestones / tags / time /
+  todos / issues-templates / workspace) + assertion updates (uploadMarkup→updateMarkup,
+  createDoc→addCollection, _id→personUuid).
+- Port e2e-live-edge/edge3/edge4/hunt5/hunt6/hunt7/verify (re-namespaced @earendil→@oh-my-pi).
+
 ## [0.1.0] — 2026-07-30
 
 - Fork from pi-huly `1.0.0-beta.14` (includes #153 `list_issues` filter fix); retarget to oh-my-pi (omp).

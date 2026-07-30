@@ -39,7 +39,7 @@ vi.mock("@hcengineering/api-client", () => {
     addCollection: vi.fn().mockResolvedValue("rest-new-attached-ref"),
     createMixin: vi.fn().mockResolvedValue({ ok: true }),
   };
-  return {
+  const apiClient = {
     connect: vi.fn().mockResolvedValue(mockPlatformClient),
     connectRest: vi.fn().mockResolvedValue(mockRestClient),
     createRestTxOperations: vi.fn().mockResolvedValue(mockTxOperations),
@@ -53,6 +53,8 @@ vi.mock("@hcengineering/api-client", () => {
     __mockRestClient: mockRestClient,
     __mockTxOperations: mockTxOperations,
   };
+  // CJS interop: source dùng default import → mock phải expose default.
+  return { default: apiClient, ...apiClient };
 });
 
 import {

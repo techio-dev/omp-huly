@@ -41,6 +41,7 @@ function makeClient() {
     createDoc: vi.fn().mockResolvedValue("comp-id-1"),
     updateDoc: vi.fn().mockResolvedValue(undefined),
     removeDoc: vi.fn().mockResolvedValue(undefined),
+    uploadMarkup: vi.fn().mockResolvedValue({ blob: "ref" }),
   };
 }
 
@@ -146,5 +147,21 @@ describe("T-52 #42: set_issue_component FK validate", () => {
     const ops = call?.[3] as { component: string };
     // component = resolved _id từ findOne (KHÔNG raw idRef(params.component))
     expect(ops.component).toBe("comp-1");
+  });
+});
+
+describe("T-103 #160: create_component label guard (non-empty)", () => {
+  it("empty label → isError, createDoc KHÔNG gọi", async () => {
+    const client = makeClient();
+    vi.mocked(getClient).mockResolvedValue(client as never);
+    const r = await findTool("huly_create_component").execute(
+      "t1",
+      { label: "" },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(r.isError).toBe(true);
+    expect(client.createDoc).not.toHaveBeenCalled();
   });
 });
