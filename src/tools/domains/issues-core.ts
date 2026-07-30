@@ -8,7 +8,7 @@
 //
 // Assignee default: D15 FR-18 (currentUser email khi absent).
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import {
   ISSUE_CLASS,
@@ -53,22 +53,22 @@ export const tools: HulyToolDefinition[] = [
       "List issues trong project. Filter by status, statusCategory, assignee, component, parentIssue, titleSearch.",
     promptSnippet: "List Huly issues in a project.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      status: Type.Optional(
-        Type.String({
-          description: "IssueStatus name or _id (resolved → Ref). See huly_list_statuses.",
-        }),
+      status: z.optional(
+        z.string().describe(
+          "IssueStatus name or _id (resolved → Ref). See huly_list_statuses.",
+        ),
       ),
       statusCategory: statusCategorySchema,
-      assignee: Type.Optional(Type.String()),
-      component: Type.Optional(
-        Type.String({ description: "Component label or _id (resolved → Ref)." }),
+      assignee: z.optional(z.string()),
+      component: z.optional(
+        z.string().describe("Component label or _id (resolved → Ref)."),
       ),
-      parentIssue: Type.Optional(Type.String()),
-      titleSearch: Type.Optional(Type.String()),
-      limit: Type.Optional(Type.Integer({ minimum: 1 })),
+      parentIssue: z.optional(z.string()),
+      titleSearch: z.optional(z.string()),
+      limit: z.optional(z.number().int().min(1)),
     }),
     async handler(params, tctx) {
       const limit = typeof params.limit === "number" ? params.limit : 50;
@@ -196,7 +196,7 @@ export const tools: HulyToolDefinition[] = [
     label: "Get issue",
     description: "Get issue detail by identifier.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
@@ -314,18 +314,18 @@ export const tools: HulyToolDefinition[] = [
     promptSnippet: "Create a new Huly issue.",
     needsProject: true,
     needsAssignee: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      title: Type.String(),
-      description: Type.Optional(Type.String()),
+      title: z.string(),
+      description: z.optional(z.string()),
       priority: prioritySchema,
-      assignee: Type.Optional(Type.String()),
-      status: Type.Optional(Type.String()),
-      taskType: Type.Optional(Type.String()),
-      parentIssue: Type.Optional(Type.String()),
-      dueDate: Type.Optional(Type.Integer()),
-      estimation: Type.Optional(Type.Integer()),
+      assignee: z.optional(z.string()),
+      status: z.optional(z.string()),
+      taskType: z.optional(z.string()),
+      parentIssue: z.optional(z.string()),
+      dueDate: z.optional(z.number().int()),
+      estimation: z.optional(z.number().int()),
     }),
     async handler(params, tctx) {
       const project = await tctx.client.findOne(PROJECT_CLASS, {
@@ -470,22 +470,21 @@ export const tools: HulyToolDefinition[] = [
     description:
       "Update issue fields. Status must match exact IssueStatus name (case-sensitive) or _id full ref.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      title: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
+      title: z.optional(z.string()),
+      description: z.optional(z.string()),
       priority: prioritySchema,
-      assignee: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-      status: Type.Optional(
-        Type.String({
-          description:
-            "Exact IssueStatus name (case-sensitive) or _id ref. Run huly_list_statuses for valid names.",
-        }),
+      assignee: z.optional(z.union([z.string(), z.null()])),
+      status: z.optional(
+        z.string().describe(
+          "Exact IssueStatus name (case-sensitive) or _id ref. Run huly_list_statuses for valid names.",
+        ),
       ),
-      dueDate: Type.Optional(Type.Integer()),
-      estimation: Type.Optional(Type.Integer()),
+      dueDate: z.optional(z.number().int()),
+      estimation: z.optional(z.number().int()),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {
@@ -621,7 +620,7 @@ export const tools: HulyToolDefinition[] = [
       type: "issue",
       id: (p as { identifier?: string }).identifier ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
@@ -655,14 +654,14 @@ export const tools: HulyToolDefinition[] = [
     label: "Move issue",
     description: "Move issue to new parent (epic). KHÔNG truyền parentIssue → promote top-level.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      parentIssue: Type.Optional(
-        Type.String({
-          description: "New parent issue identifier. KHÔNG truyền = top-level promotion.",
-        }),
+      parentIssue: z.optional(
+        z.string().describe(
+          "New parent issue identifier. KHÔNG truyền = top-level promotion.",
+        ),
       ),
     }),
     async handler(params, tctx) {
@@ -767,11 +766,11 @@ export const tools: HulyToolDefinition[] = [
       "Add label/tag to issue. Accepts tag title or _id (resolved via tags:class:TagElement). " +
       "Validates tag exists before push. Use huly_create_tag to create new.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      label: Type.String({ description: "Label title or _id ref." }),
+      label: z.string().describe("Label title or _id ref."),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {
@@ -853,11 +852,11 @@ export const tools: HulyToolDefinition[] = [
       "Remove global label from issue. Accepts label title or _id. " +
       "No-op if label not present on issue (idempotent).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      label: Type.String({ description: "Label title or _id ref." }),
+      label: z.string().describe("Label title or _id ref."),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {

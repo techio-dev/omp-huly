@@ -2,8 +2,8 @@
 // Tách ra để tránh duplicate fmtDate/getOrCreateText/joinLines/opt giữa 2 file
 // (code-review-mentor #3). Cũng chứa ANSI sanitize (#5 security).
 
-import { Text } from "@earendil-works/pi-tui";
-import type { Component } from "@earendil-works/pi-tui";
+import { Text } from "@oh-my-pi/pi-tui";
+import type { Component } from "@oh-my-pi/pi-tui";
 
 /**
  * Minimal theme surface mà render dùng. Pi Theme runtime CHỈ có fg/bg/bold/...,

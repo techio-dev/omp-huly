@@ -17,6 +17,7 @@ import {
 
 const TEST_DIR = join(tmpdir(), `pi-huly-test-${process.pid}`);
 const TEST_PATH = join(TEST_DIR, "config.json");
+const NONEXISTENT_PATH = join(tmpdir(), `nonexistent-${process.pid}`, "config.json");
 
 async function writeConfig(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -32,7 +33,7 @@ describe("loadConfig", () => {
   });
 
   it("returns DEFAULT_CONFIG when file does not exist", async () => {
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.version).toBe(1);
     expect(config.transport).toBe("ws");
     expect(config.projects).toEqual({});
@@ -40,19 +41,19 @@ describe("loadConfig", () => {
 
   it("parses file with transport=ws", async () => {
     await writeConfig(TEST_PATH, JSON.stringify({ version: 1, transport: "ws", projects: {} }));
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.transport).toBe("ws");
   });
 
   it("parses file with transport=rest", async () => {
     await writeConfig(TEST_PATH, JSON.stringify({ version: 1, transport: "rest", projects: {} }));
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.transport).toBe("rest");
   });
 
   it("defaults transport to ws when field missing", async () => {
     await writeConfig(TEST_PATH, JSON.stringify({ version: 1, projects: {} }));
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.transport).toBe("ws");
   });
 
@@ -66,7 +67,7 @@ describe("loadConfig", () => {
         },
       }),
     );
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.projects["/a/b"]).toEqual({ workspace: "myteam", project: "proj1" });
   });
 
@@ -75,28 +76,28 @@ describe("loadConfig", () => {
       TEST_PATH,
       JSON.stringify({ version: 1, projects: {}, pool: { maxSize: 4 } }),
     );
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.pool?.maxSize).toBe(4);
   });
 
   it("throws when file is malformed JSON", async () => {
     await writeConfig(TEST_PATH, "{ not json");
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/malformed|json/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/malformed|json/i);
   });
 
   it("throws when version != 1", async () => {
     await writeConfig(TEST_PATH, JSON.stringify({ version: 2, projects: {} }));
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/version must be 1/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/version must be 1/i);
   });
 
   it("throws when transport invalid", async () => {
     await writeConfig(TEST_PATH, JSON.stringify({ version: 1, transport: "grpc", projects: {} }));
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/transport must be/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/transport must be/i);
   });
 
   it("throws when projects not an object", async () => {
     await writeConfig(TEST_PATH, JSON.stringify({ version: 1, projects: "not-object" }));
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/projects must be an object/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/projects must be an object/i);
   });
 
   it("throws when binding missing workspace field", async () => {
@@ -104,7 +105,7 @@ describe("loadConfig", () => {
       TEST_PATH,
       JSON.stringify({ version: 1, projects: { "/a": { project: "p" } } }),
     );
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/workspace required/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/workspace required/i);
   });
 
   it("throws when binding missing project field", async () => {
@@ -112,7 +113,7 @@ describe("loadConfig", () => {
       TEST_PATH,
       JSON.stringify({ version: 1, projects: { "/a": { workspace: "ws" } } }),
     );
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/project required/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/project required/i);
   });
 
   it("throws when pool.maxSize negative", async () => {
@@ -120,7 +121,7 @@ describe("loadConfig", () => {
       TEST_PATH,
       JSON.stringify({ version: 1, projects: {}, pool: { maxSize: -1 } }),
     );
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/pool.maxSize must be positive/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/pool.maxSize must be positive/i);
   });
 
   it("throws when pool.maxSize not a number", async () => {
@@ -128,7 +129,7 @@ describe("loadConfig", () => {
       TEST_PATH,
       JSON.stringify({ version: 1, projects: {}, pool: { maxSize: "big" } }),
     );
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/pool.maxSize must be positive/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/pool.maxSize must be positive/i);
   });
 
   // T-62 #67: quietUpstreamNoise + upstreamNoisePatterns schema validation.
@@ -142,7 +143,7 @@ describe("loadConfig", () => {
         upstreamNoisePatterns: ["^custom pattern$", "^another /"],
       }),
     );
-    const cfg = await loadConfig(TEST_PATH);
+    const cfg = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(cfg.quietUpstreamNoise).toBe(false);
     expect(cfg.upstreamNoisePatterns).toEqual(["^custom pattern$", "^another /"]);
   });
@@ -152,7 +153,7 @@ describe("loadConfig", () => {
       TEST_PATH,
       JSON.stringify({ version: 1, projects: {}, quietUpstreamNoise: "yes" }),
     );
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/quietUpstreamNoise must be boolean/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/quietUpstreamNoise must be boolean/i);
   });
 
   it("T-62: throws khi upstreamNoisePatterns không phải array", async () => {
@@ -160,7 +161,7 @@ describe("loadConfig", () => {
       TEST_PATH,
       JSON.stringify({ version: 1, projects: {}, upstreamNoisePatterns: "not-array" }),
     );
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/upstreamNoisePatterns must be array/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/upstreamNoisePatterns must be array/i);
   });
 
   it("T-62: throws khi upstreamNoisePatterns[i] invalid RegExp", async () => {
@@ -168,12 +169,12 @@ describe("loadConfig", () => {
       TEST_PATH,
       JSON.stringify({ version: 1, projects: {}, upstreamNoisePatterns: ["[unclosed"] }),
     );
-    await expect(loadConfig(TEST_PATH)).rejects.toThrow(/not valid RegExp/i);
+    await expect(loadConfig(TEST_PATH, NONEXISTENT_PATH)).rejects.toThrow(/not valid RegExp/i);
   });
 
   it("T-62: defaults — quietUpstreamNoise undefined khi không set", async () => {
     await writeConfig(TEST_PATH, JSON.stringify({ version: 1, projects: {} }));
-    const cfg = await loadConfig(TEST_PATH);
+    const cfg = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(cfg.quietUpstreamNoise).toBeUndefined();
     expect(cfg.upstreamNoisePatterns).toBeUndefined();
   });
@@ -210,7 +211,7 @@ describe("saveConfig", () => {
     };
     await saveConfig(config, TEST_PATH);
     expect(existsSync(TEST_PATH)).toBe(true);
-    const loaded = await loadConfig(TEST_PATH);
+    const loaded = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(loaded).toEqual(config);
   });
 
@@ -237,20 +238,20 @@ describe("bindProject", () => {
 
   it("binds cwd → {workspace, project}", async () => {
     await bindProject("/a/b", { workspace: "myteam", project: "proj1" }, TEST_PATH);
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.projects["/a/b"]).toEqual({ workspace: "myteam", project: "proj1" });
   });
 
   it("upserts (updates) existing cwd binding", async () => {
     await bindProject("/a/b", { workspace: "old", project: "old" }, TEST_PATH);
     await bindProject("/a/b", { workspace: "new", project: "new" }, TEST_PATH);
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.projects["/a/b"]).toEqual({ workspace: "new", project: "new" });
   });
 
   it("normalizes cwd path before bind", async () => {
     await bindProject("/a/./b/", { workspace: "ws", project: "p" }, TEST_PATH);
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.projects["/a/b"]).toBeDefined();
     expect(config.projects["/a/./b/"]).toBeUndefined();
   });
@@ -282,7 +283,7 @@ describe("unbindProject", () => {
     await bindProject("/a/b", { workspace: "ws", project: "p" }, TEST_PATH);
     await bindProject("/c/d", { workspace: "ws2", project: "p2" }, TEST_PATH);
     await unbindProject("/a/b", TEST_PATH);
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.projects["/a/b"]).toBeUndefined();
     expect(config.projects["/c/d"]).toBeDefined();
   });
@@ -290,7 +291,7 @@ describe("unbindProject", () => {
   it("is no-op when cwd does not exist", async () => {
     await bindProject("/a/b", { workspace: "ws", project: "p" }, TEST_PATH);
     await expect(unbindProject("/nonexistent", TEST_PATH)).resolves.toBeUndefined();
-    const config = await loadConfig(TEST_PATH);
+    const config = await loadConfig(TEST_PATH, NONEXISTENT_PATH);
     expect(config.projects["/a/b"]).toBeDefined();
   });
 });

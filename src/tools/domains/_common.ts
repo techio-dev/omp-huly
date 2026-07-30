@@ -1,69 +1,51 @@
-// Common typebox schemas cho domain tools — tránh lặp.
+// Common Zod schemas cho domain tools — tránh lặp.
 // 06-api.md §2 Common Parameters Convention.
 
-import { Type, type TObject, type TOptional, type TString, type TInteger } from "typebox";
+import { z } from "zod";
 import type { Class, Doc, DocumentUpdate, Ref, Space, TxResult } from "@hcengineering/api-client";
 import type { HulyClient } from "../../client/client.js";
 import type { HulyToolResult } from "../builder.js";
 import { PROJECT_CLASS, PROJECT_TYPE_CLASS, STATUS_CLASS } from "./_class-refs.js";
 
 /** Workspace override param (mọi tool). */
-export const workspaceParam: TOptional<TString> = Type.Optional(
-  Type.String({
-    description: "Workspace id-handle override (default: cwd-map).",
-  }),
+export const workspaceParam = z.optional(
+  z.string().describe("Workspace id-handle override (default: cwd-map)."),
 );
 
 /** Project override param (project-scoped tools). */
-export const projectParam: TOptional<TString> = Type.Optional(
-  Type.String({
-    description: "Huly project identifier (vd PD). Default: cwd-map.",
-  }),
+export const projectParam = z.optional(
+  z.string().describe("Huly project identifier (vd PD). Default: cwd-map."),
 );
 
 /** Limit param (list tools). Default service-side, pi truncate 50KB/2000 lines. */
-export const limitParam: TOptional<TInteger> = Type.Optional(
-  Type.Integer({ description: "Max results (default: 50).", minimum: 1 }),
+export const limitParam = z.optional(
+  z.number().int().describe("Max results (default: 50).").min(1),
 );
 
 /** Identifier param (issue). vd "PD-123" HOẶC raw num. */
-export const identifierParam = Type.String({
-  description: 'Issue identifier (vd "PD-123") hoặc raw number.',
-});
+export const identifierParam = z.string().describe('Issue identifier (vd "PD-123") hoặc raw number.');
 
 /** Priority enum (create/update issue). */
-export const prioritySchema = Type.Optional(
-  Type.Union([
-    Type.Literal("urgent"),
-    Type.Literal("high"),
-    Type.Literal("medium"),
-    Type.Literal("low"),
-    Type.Literal("no-priority"),
-  ]),
+export const prioritySchema = z.optional(
+  z.enum(["urgent", "high", "medium", "low", "no-priority"]),
 );
 
 /** statusCategory enum (list/update issue, derived). */
-export const statusCategorySchema = Type.Optional(
-  Type.Union([
-    Type.Literal("UnStarted"),
-    Type.Literal("ToDo"),
-    Type.Literal("Active"),
-    Type.Literal("Won"),
-    Type.Literal("Lost"),
-  ]),
+export const statusCategorySchema = z.optional(
+  z.enum(["UnStarted", "ToDo", "Active", "Won", "Lost"]),
 );
 
 /** Base params mọi tool có: workspace?. */
-export function baseParams(): TObject {
-  return Type.Object({ workspace: workspaceParam });
+export function baseParams() {
+  return z.object({ workspace: workspaceParam });
 }
 
 /**
  * Project base params: workspace? + project?.
  * Domain tool extend thêm field riêng.
  */
-export function projectParams(): TObject {
-  return Type.Object({ workspace: workspaceParam, project: projectParam });
+export function projectParams() {
+  return z.object({ workspace: workspaceParam, project: projectParam });
 }
 
 /**

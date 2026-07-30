@@ -1,7 +1,7 @@
 // tools/domains/issues-templates.ts — Issue templates domain (8 tools).
 // Design: 06-api.md §4 Issue templates. CRUD + create_from + children.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import {
   ISSUE_TEMPLATE_CLASS,
@@ -44,7 +44,7 @@ export const tools: HulyToolDefinition[] = [
     label: "List issue templates",
     description: "List issue templates trong project.",
     needsProject: true,
-    parameters: Type.Object({ workspace: workspaceParam, project: projectParam }),
+    parameters: z.object({ workspace: workspaceParam, project: projectParam }),
     async handler(_params, tctx) {
       // T-71: space scoping (KHÔNG findAll global cross-project).
       const space = await getProjectSpace(tctx.client, tctx.project!);
@@ -83,10 +83,10 @@ export const tools: HulyToolDefinition[] = [
     label: "Get issue template",
     description: "Get issue template by id.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      template: Type.String(),
+      template: z.string(),
     }),
     async handler(params, tctx) {
       // T-100 (#146): scope template lookup theo project space (mirror components.ts T-81).
@@ -161,11 +161,11 @@ export const tools: HulyToolDefinition[] = [
     label: "Create issue template",
     description: "Create issue template.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      title: Type.String(),
-      description: Type.Optional(Type.String()),
+      title: z.string(),
+      description: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       const project = await tctx.client.findOne(PROJECT_CLASS, {
@@ -212,11 +212,11 @@ export const tools: HulyToolDefinition[] = [
     label: "Create issue from template",
     description: "Create new issue from template.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      template: Type.String(),
-      title: Type.Optional(Type.String()),
+      template: z.string(),
+      title: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       // T-100 (#146): project first — dùng project._id scope cho tpl lookup
@@ -275,12 +275,12 @@ export const tools: HulyToolDefinition[] = [
     label: "Update issue template",
     description: "Update template (title, description).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      template: Type.String(),
-      title: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
+      template: z.string(),
+      title: z.optional(z.string()),
+      description: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       // T-100 (#146): scope template lookup theo project space.
@@ -330,10 +330,10 @@ export const tools: HulyToolDefinition[] = [
       type: "template",
       id: (p as { template?: string }).template ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      template: Type.String(),
+      template: z.string(),
     }),
     async handler(params, tctx) {
       // T-100 (#146): scope template lookup theo project space.
@@ -372,16 +372,16 @@ export const tools: HulyToolDefinition[] = [
     description:
       "Add child template to parent. Builds IssueTemplateChild object {id,title,priority,...} + replaces full children array.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      template: Type.String(),
-      title: Type.String(),
-      description: Type.Optional(Type.String()),
-      priority: Type.Optional(Type.String()),
-      assignee: Type.Optional(Type.String()),
-      component: Type.Optional(Type.String()),
-      estimation: Type.Optional(Type.Integer()),
+      template: z.string(),
+      title: z.string(),
+      description: z.optional(z.string()),
+      priority: z.optional(z.string()),
+      assignee: z.optional(z.string()),
+      component: z.optional(z.string()),
+      estimation: z.optional(z.number().int()),
     }),
     async handler(params, tctx) {
       // T-100 (#146): scope template lookup theo project space.
@@ -464,11 +464,11 @@ export const tools: HulyToolDefinition[] = [
     label: "Remove template child",
     description: "Remove child from parent template (by child id).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      template: Type.String(),
-      childId: Type.String({ description: "IssueTemplateChild.id to remove." }),
+      template: z.string(),
+      childId: z.string().describe("IssueTemplateChild.id to remove."),
     }),
     async handler(params, tctx) {
       // T-100 (#146): scope template lookup theo project space.

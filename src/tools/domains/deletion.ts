@@ -1,7 +1,7 @@
 // tools/domains/deletion.ts — Deletion preview domain (1 tool).
 // Design: 06-api.md §4 Deletion. Preview cascade trước khi delete.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { workspaceParam, projectParam, identifierParam, resolveIdentifier } from "./_common.js";
 import { ISSUE_CLASS } from "./_class-refs.js";
@@ -14,12 +14,12 @@ export const tools: HulyToolDefinition[] = [
     description:
       "Preview cascade deletion của entity (issues, comments, attachments affected). KHÔNG xóa — preview only.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      _class: Type.Optional(
-        Type.String({ description: "Entity _class (default: tracker:class:Issue)." }),
+      _class: z.optional(
+        z.string().describe("Entity _class (default: tracker:class:Issue)."),
       ),
     }),
     async handler(params, tctx) {

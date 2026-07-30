@@ -2,7 +2,7 @@
 // Strategy: test pure format function với theme stub + render wrapper.
 
 import { describe, expect, it } from "vitest";
-import { Text } from "@earendil-works/pi-tui";
+import { Text } from "@oh-my-pi/pi-tui";
 import { formatDocumentPreview, renderDocumentResult, type RenderTheme } from "../document.js";
 
 // Theme stub: CHỈ fg/bg/bold — match runtime pi Theme (KHÔNG có dim/muted methods).

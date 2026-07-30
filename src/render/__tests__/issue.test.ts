@@ -3,7 +3,7 @@
 // Test render wrappers (return Component + reuse lastComponent).
 
 import { describe, expect, it } from "vitest";
-import { Text } from "@earendil-works/pi-tui";
+import { Text } from "@oh-my-pi/pi-tui";
 import {
   formatIssueCard,
   formatIssueList,

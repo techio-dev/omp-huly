@@ -10,4 +10,6 @@ allowBuilds:
   '@hcengineering/text-markdown': true
   '@hcengineering/tracker': true
   msgpackr-extract: true
+  onnxruntime-node: false
   protobufjs: true
+  sharp: false

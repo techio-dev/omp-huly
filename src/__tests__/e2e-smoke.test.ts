@@ -18,7 +18,7 @@
 // claim runtime e2e pass.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 
 // === Mock resolver + pool + client factory BEFORE import tool definitions ===
 // Builder import pool.getClient + resolver.resolveWorkspace/resolveProject +

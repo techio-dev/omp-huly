@@ -3,7 +3,7 @@
 //
 // Tags khác labels: PROJECT-SCOPED (không global). (05-data-model §3)
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { TAG_CLASS, TAG_REFERENCE_CLASS, ISSUE_CLASS, idRef } from "./_class-refs.js";
 import {
@@ -23,11 +23,11 @@ export const tools: HulyToolDefinition[] = [
     label: "List tags",
     description: "List tags trong project. Optional targetClass filter (vd tracker:class:Issue).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      targetClass: Type.Optional(
-        Type.String({ description: "Filter tags theo target class (vd tracker:class:Issue)." }),
+      targetClass: z.optional(
+        z.string().describe("Filter tags theo target class (vd tracker:class:Issue)."),
       ),
     }),
     async handler(params, tctx) {
@@ -62,11 +62,11 @@ export const tools: HulyToolDefinition[] = [
     label: "Create tag",
     description: "Create tag (project-scoped).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      title: Type.String(),
-      color: Type.Optional(Type.String()),
+      title: z.string(),
+      color: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       // T-93 (#139): tạo trong PROJECT space (project._id self-ref qua
@@ -97,12 +97,12 @@ export const tools: HulyToolDefinition[] = [
     label: "Update tag",
     description: "Update tag (title, color).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      tag: Type.String(),
-      title: Type.Optional(Type.String()),
-      color: Type.Optional(Type.String()),
+      tag: z.string(),
+      title: z.optional(z.string()),
+      color: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       const t = await tctx.client.findOne(TAG_CLASS, { _id: params.tag });
@@ -139,10 +139,10 @@ export const tools: HulyToolDefinition[] = [
       type: "tag",
       id: (p as { tag?: string }).tag ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      tag: Type.String(),
+      tag: z.string(),
     }),
     async handler(params, tctx) {
       const t = await tctx.client.findOne(TAG_CLASS, { _id: params.tag });
@@ -168,7 +168,7 @@ export const tools: HulyToolDefinition[] = [
     label: "List attached tags",
     description: "List tags attached to issue.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
@@ -211,11 +211,11 @@ export const tools: HulyToolDefinition[] = [
     label: "Attach tag",
     description: "Attach tag to issue. Accepts tag title or _id (resolved title-first).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      tag: Type.String({ description: "Tag title or _id." }),
+      tag: z.string().describe("Tag title or _id."),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {
@@ -291,11 +291,11 @@ export const tools: HulyToolDefinition[] = [
     label: "Detach tag",
     description: "Detach tag from issue. Accepts tag title or _id (resolved title-first).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      tag: Type.String({ description: "Tag title or _id." }),
+      tag: z.string().describe("Tag title or _id."),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {

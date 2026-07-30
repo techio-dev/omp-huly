@@ -5,7 +5,7 @@
 // (Huly native unit, fractional OK — 0.25 = 15min), date + employee fields.
 // reality-checker CONFIRMED vs trusted time.ts + tracker-types.ts.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { TIME_SPEND_REPORT_CLASS, ISSUE_CLASS, EMPLOYEE_CLASS } from "./_class-refs.js";
 import { workspaceParam, projectParam, identifierParam, resolveIdentifier } from "./_common.js";
@@ -20,15 +20,12 @@ export const tools: HulyToolDefinition[] = [
       "Fractional allowed. Employee resolved từ current user.",
     promptSnippet: "Log time spent on a Huly issue.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      value: Type.Number({
-        description: "Time in HOURS (0.25 = 15min, 8 = 1 day).",
-        minimum: 0.01,
-      }),
-      description: Type.Optional(Type.String()),
+      value: z.number().describe("Time in HOURS (0.25 = 15min, 8 = 1 day).").min(0.01),
+      description: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {

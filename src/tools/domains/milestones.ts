@@ -9,7 +9,7 @@
 //   5. huly_set_issue_milestone    — gán issue → milestone
 //   6. huly_delete_milestone       — destructive
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { MILESTONE_CLASS, ISSUE_CLASS, PROJECT_CLASS } from "./_class-refs.js";
 
@@ -53,7 +53,7 @@ export const tools: HulyToolDefinition[] = [
     label: "List milestones",
     description: "List milestones trong project.",
     needsProject: true,
-    parameters: Type.Object({ workspace: workspaceParam, project: projectParam }),
+    parameters: z.object({ workspace: workspaceParam, project: projectParam }),
     async handler(_params, tctx) {
       // T-71: space scoping (KHÔNG findAll global cross-project).
       const space = await getProjectSpace(tctx.client, tctx.project!);
@@ -91,10 +91,10 @@ export const tools: HulyToolDefinition[] = [
     label: "Get milestone",
     description: "Get milestone by id.",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      milestone: Type.String({ description: "Milestone id." }),
+      milestone: z.string().describe("Milestone id."),
     }),
     async handler(params, tctx) {
       // T-100 (#146): scope milestone lookup theo project space (mirror components.ts T-81).
@@ -166,14 +166,12 @@ export const tools: HulyToolDefinition[] = [
     label: "Create milestone",
     description: "Create milestone. targetDate BẮT BUỘC (Unix ms).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      label: Type.String(),
-      description: Type.Optional(Type.String()),
-      targetDate: Type.Integer({
-        description: "Unix ms timestamp (BẮT BUỘC).",
-      }),
+      label: z.string(),
+      description: z.optional(z.string()),
+      targetDate: z.number().int().describe("Unix ms timestamp (BẮT BUỘC)."),
     }),
     async handler(params, tctx) {
       const project = await tctx.client.findOne(PROJECT_CLASS, {
@@ -208,19 +206,19 @@ export const tools: HulyToolDefinition[] = [
     label: "Update milestone",
     description: "Update milestone (label, description, targetDate, status).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      milestone: Type.String(),
-      label: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
-      targetDate: Type.Optional(Type.Integer()),
-      status: Type.Optional(
-        Type.Union([
-          Type.Literal("planned"),
-          Type.Literal("in-progress"),
-          Type.Literal("completed"),
-          Type.Literal("canceled"),
+      milestone: z.string(),
+      label: z.optional(z.string()),
+      description: z.optional(z.string()),
+      targetDate: z.optional(z.number().int()),
+      status: z.optional(
+        z.union([
+          z.literal("planned"),
+          z.literal("in-progress"),
+          z.literal("completed"),
+          z.literal("canceled"),
         ]),
       ),
     }),
@@ -278,12 +276,12 @@ export const tools: HulyToolDefinition[] = [
     label: "Set issue milestone",
     description: "Gán milestone cho issue. Qua identifier (PD-123 HOẶC raw num).",
     needsProject: true,
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
       // T-82G #108: milestone=null → clear (unassign).
-      milestone: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+      milestone: z.optional(z.union([z.string(), z.null()])),
     }),
     async handler(params, tctx) {
       const issue = await tctx.client.findOne(ISSUE_CLASS, {
@@ -340,10 +338,10 @@ export const tools: HulyToolDefinition[] = [
       type: "milestone",
       id: (p as { milestone?: string }).milestone ?? "<unknown>",
     }),
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
-      milestone: Type.String(),
+      milestone: z.string(),
     }),
     async handler(params, tctx) {
       // T-100 (#146): scope milestone lookup theo project space.

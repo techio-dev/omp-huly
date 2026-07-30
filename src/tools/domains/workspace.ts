@@ -10,7 +10,7 @@
 //
 // _class refs: contact.class.Person + contact.mixin:Employee (string literal).
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { PERSON_CLASS, idRef } from "./_class-refs.js";
 import { safeUpdateDoc } from "./_common.js";
@@ -22,12 +22,8 @@ export const tools: HulyToolDefinition[] = [
     label: "Get workspace info",
     description: "Get current workspace info (id, resolved). Use để verify binding sau /huly init.",
     promptSnippet: "Get current Huly workspace binding info.",
-    parameters: Type.Object({
-      workspace: Type.Optional(
-        Type.String({
-          description: "Workspace id-handle override (default: cwd-map).",
-        }),
-      ),
+    parameters: z.object({
+      workspace: z.optional(z.string().describe("Workspace id-handle override (default: cwd-map).")),
     }),
     async handler(_params, tctx) {
       return {
@@ -42,23 +38,21 @@ export const tools: HulyToolDefinition[] = [
     name: "list_workspaces",
     label: "List workspaces",
     description:
-      "UNAVAILABLE — needs AccountClient HTTP layer (pi-huly data-client only). " +
-      "Workspaces = account-level (WorkspaceInfoWithStatus), not workspace-model query. " +
-      "Deferred behind ADR (add @hcengineering/account-client dep).",
-    promptSnippet: "List Huly workspaces accessible by current user.",
-    parameters: Type.Object({
-      workspace: Type.Optional(Type.String()),
-      limit: Type.Optional(Type.Integer({ minimum: 1 })),
+      "UNAVAILABLE — workspaces = account-level data (AccountClient.listWorkspaces). " +
+      "Use huly_get_workspace_info for current workspace binding. Deferred behind ADR.",
+    promptSnippet: "List Huly workspaces.",
+    parameters: z.object({
+      workspace: z.optional(z.string()),
+      limit: z.optional(z.number().int().describe("Max results (default: 50).").min(1)),
     }),
     async handler(_params, _tctx) {
       return {
         content:
-          "list_workspaces KHÔNG khả dụng: workspaces = account-level data requiring " +
-          "AccountClient HTTP layer (pi-huly currently bundles data-client ws only). " +
-          "Deferred behind ADR — add @hcengineering/account-client dep + WorkspaceClient " +
-          "wrapper (AccountClient.getUserWorkspaces).",
+          "list_workspaces KHÔNG khả dụng: workspaces = account-level data " +
+          "(AccountClient.listWorkspaces, HTTP). Use huly_get_workspace_info for current workspace. " +
+          "Deferred behind ADR.",
         isError: true,
-        details: { reason: "account_client_layer_required" },
+        details: { reason: "account_client_layer_required", alternative: "huly_get_workspace_info" },
       };
     },
   }),
@@ -71,9 +65,9 @@ export const tools: HulyToolDefinition[] = [
       "UNAVAILABLE — workspace members with roles = account-level data (AccountClient.getWorkspaceMembers). " +
       "Use huly_list_employees for employee data (data-client). Deferred behind ADR.",
     promptSnippet: "List Huly workspace members.",
-    parameters: Type.Object({
-      workspace: Type.Optional(Type.String()),
-      limit: Type.Optional(Type.Integer({ minimum: 1 })),
+    parameters: z.object({
+      workspace: z.optional(z.string()),
+      limit: z.optional(z.number().int().describe("Max results (default: 50).").min(1)),
     }),
     async handler(_params, _tctx) {
       return {
@@ -93,8 +87,8 @@ export const tools: HulyToolDefinition[] = [
     label: "Get user profile",
     description: "Get current user profile (id, name, email) — default assignee source.",
     promptSnippet: "Get current Huly user profile.",
-    parameters: Type.Object({
-      workspace: Type.Optional(Type.String()),
+    parameters: z.object({
+      workspace: z.optional(z.string()),
     }),
     async handler(_params, tctx) {
       return {
@@ -112,10 +106,10 @@ export const tools: HulyToolDefinition[] = [
       'Update current user name (firstName/lastName → Huly "LastName,FirstName" format). ' +
       "Bio/city/socialLinks honest-unavailable (account-client ADR pending).",
     promptSnippet: "Update current Huly user profile.",
-    parameters: Type.Object({
-      workspace: Type.Optional(Type.String()),
-      firstName: Type.Optional(Type.String({ description: "First name." })),
-      lastName: Type.Optional(Type.String({ description: "Last name." })),
+    parameters: z.object({
+      workspace: z.optional(z.string()),
+      firstName: z.optional(z.string().describe("First name.")),
+      lastName: z.optional(z.string().describe("Last name.")),
     }),
     async handler(params, tctx) {
       // T-82 #105: Huly Person.name = "LastName,FirstName" (trusted persons.ts:65).

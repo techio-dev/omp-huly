@@ -5,7 +5,7 @@
 //   HULY_E2E_PROJECT=ETEST pnpm vitest run src/__tests__/e2e-live-domains.test.ts
 
 import { describe, expect, it } from "vitest";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { tools as issueCore } from "../tools/domains/issues-core.js";
 import { tools as comments } from "../tools/domains/comments.js";
 import { tools as todos } from "../tools/domains/todos.js";

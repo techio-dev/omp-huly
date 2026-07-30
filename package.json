@@ -1,26 +1,26 @@
 {
-  "name": "pi-huly",
-  "version": "1.0.0-beta.14",
-  "description": "Native Huly support cho pi-coding-agent — tools + skills + subagent (KHÔNG MCP, gọi thẳng WebSocket API)",
+  "name": "omp-huly",
+  "version": "0.1.0",
+  "description": "Native Huly support cho oh-my-pi (omp) — tools (KHÔNG MCP, gọi thẳng WebSocket API). Fork của pi-huly.",
   "keywords": [
     "huly",
-    "pi-coding-agent",
+    "oh-my-pi",
+    "omp",
     "pi-package",
     "project-management"
   ],
-  "homepage": "https://github.com/naicoi92/pi-huly",
+  "homepage": "https://github.com/techio-dev/omp-huly",
   "bugs": {
-    "url": "https://github.com/naicoi92/pi-huly/issues"
+    "url": "https://github.com/techio-dev/omp-huly/issues"
   },
   "license": "MIT",
   "author": "naicoi92",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/naicoi92/pi-huly.git"
+    "url": "git+ssh://git@github.com/techio-dev/omp-huly.git"
   },
   "files": [
     "dist",
-    "skills",
     "README.md",
     "LICENSE",
     "NOTICE.md",
@@ -53,7 +53,8 @@
     "@hcengineering/platform": "^0.7.423",
     "@hcengineering/text-core": "^0.7.423",
     "@hcengineering/text-markdown": "^0.7.423",
-    "ws": "^8.21.1"
+    "ws": "^8.21.1",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.10",
@@ -61,26 +62,20 @@
     "oxfmt": "^0.60.0",
     "oxlint": "^1.75.0",
     "rolldown": "^1.2.0",
-    "typebox": "^1.3.8",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   },
   "peerDependencies": {
-    "@earendil-works/pi-agent-core": "*",
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
-    "typebox": "*"
+    "@oh-my-pi/pi-agent-core": "*",
+    "@oh-my-pi/pi-coding-agent": "*",
+    "@oh-my-pi/pi-tui": "*"
   },
   "engines": {
     "node": ">=22.19.0"
   },
-  "pi": {
+  "omp": {
     "extensions": [
       "./dist/index.mjs"
-    ],
-    "skills": [
-      "./skills"
     ]
   }
 }

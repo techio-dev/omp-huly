@@ -11,7 +11,7 @@
 // Bonus fixes: list_task_types field ofProjectType → parent; create_task_type
 // field ofProjectType → parent + register projectType.tasks.
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import {
   PROJECT_TYPE_CLASS,
@@ -39,7 +39,7 @@ export const tools: HulyToolDefinition[] = [
     name: "list_project_types",
     label: "List project types",
     description: "List project types (vd tracker, recruiting, inventory).",
-    parameters: Type.Object({ workspace: workspaceParam }),
+    parameters: z.object({ workspace: workspaceParam }),
     async handler(_params, tctx) {
       const pts = await tctx.client.findAll(PROJECT_TYPE_CLASS, {}, {});
       const list = pts.map((p) => ({
@@ -59,9 +59,9 @@ export const tools: HulyToolDefinition[] = [
     name: "get_project_type",
     label: "Get project type",
     description: "Get project type by id.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      projectType: Type.String(),
+      projectType: z.string(),
     }),
     async handler(params, tctx) {
       const pt = await tctx.client.findOne(PROJECT_TYPE_CLASS, {
@@ -90,9 +90,9 @@ export const tools: HulyToolDefinition[] = [
     name: "list_task_types",
     label: "List task types",
     description: "List task types cho project type.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      projectType: Type.Optional(Type.String()),
+      projectType: z.optional(z.string()),
     }),
     async handler(params, tctx) {
       // T-73: query field `parent` (KHÔNG ofProjectType — trusted getTaskTypesByProjectType).
@@ -118,10 +118,10 @@ export const tools: HulyToolDefinition[] = [
     label: "Create task type",
     description:
       "Create task type trong project type + register vào projectType.tasks. Copies descriptor fields from a sibling template task type.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      name: Type.String(),
-      projectType: Type.String(),
+      name: z.string(),
+      projectType: z.string(),
     }),
     async handler(params, tctx) {
       const projectType = await tctx.client.findOne<ProjectTypeDoc>(PROJECT_TYPE_CLASS, {
@@ -255,17 +255,11 @@ export const tools: HulyToolDefinition[] = [
     label: "Create issue status",
     description:
       "Create issue status + register vào project workflow. Requires taskType param (resolve statusClass). Idempotent per taskType+name.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      taskType: Type.String({ description: "TaskType _id (resolve statusClass + register)." }),
-      name: Type.String(),
-      category: Type.Union([
-        Type.Literal("UnStarted"),
-        Type.Literal("ToDo"),
-        Type.Literal("Active"),
-        Type.Literal("Won"),
-        Type.Literal("Lost"),
-      ]),
+      taskType: z.string().describe("TaskType _id (resolve statusClass + register)."),
+      name: z.string(),
+      category: z.enum(["UnStarted", "ToDo", "Active", "Won", "Lost"]),
     }),
     async handler(params, tctx) {
       // T-73: resolve taskType → statusClass + parent projectType. T-90: native TaskTypeDoc.

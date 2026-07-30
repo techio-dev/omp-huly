@@ -14,7 +14,7 @@
 // update tool description rõ Document search KHÔNG available (dùng
 // huly_list_documents trong teamspace cụ thể để browse document).
 
-import { Type } from "typebox";
+import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { workspaceParam, limitParam, escapeLikePattern } from "./_common.js";
 import { ISSUE_CLASS, CHAT_MESSAGE_CLASS } from "./_class-refs.js";
@@ -73,9 +73,9 @@ export const tools: HulyToolDefinition[] = [
       "(Huly tracker:class:Document not registered runtime) — use huly_list_documents " +
       "in a specific teamspace to browse documents. Global across workspace.",
     promptSnippet: "Search Huly issues + messages by substring.",
-    parameters: Type.Object({
+    parameters: z.object({
       workspace: workspaceParam,
-      query: Type.String({ description: "Search query (substring, case-insensitive)." }),
+      query: z.string().describe("Search query (substring, case-insensitive)."),
       limit: limitParam,
     }),
     async handler(params, tctx) {

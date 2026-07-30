@@ -17,8 +17,8 @@ import type {
   AgentToolResult,
   ExtensionAPI,
   ToolRenderResultOptions,
-} from "@earendil-works/pi-coding-agent";
-import type { Component } from "@earendil-works/pi-tui";
+} from "@oh-my-pi/pi-coding-agent";
+import type { Component } from "@oh-my-pi/pi-tui";
 
 import { HULY_VERSION } from "./version.js";
 // Re-export giữ backward-compat cho consumer import từ index.
@@ -38,15 +38,18 @@ import {
 import { loadConfig, type Config } from "./config/config.js";
 
 /**
- * Render hook signature (pi ToolDefinition.renderResult subset).
- * ToolRenderContext KHÔNG re-export public từ pi → dùng context minimal.
- * Dùng AgentToolResult + ToolRenderResultOptions thật từ pi (type-safe hơn cast toàn bộ).
+ * Render hook signature (omp ToolDefinition.renderResult).
+ * omp calls renderResult(result, options, theme, args) — `args` is the tool's
+ * parsed params (NOT pi's { lastComponent }). The render funcs read
+ * `context.lastComponent` for Text reuse; with omp `args` that field is absent
+ * → getOrCreateText() always makes a fresh Text (no crash, minor: no reuse).
+ * AgentToolResult + ToolRenderResultOptions are omp types (type-safe).
  */
 type RenderHook = (
   result: AgentToolResult<unknown>,
   options: ToolRenderResultOptions,
   theme: unknown,
-  context: { lastComponent?: Component },
+  args: unknown,
 ) => Component;
 
 /** Map tool name → render hook (3 high-value per design 04 §6 D12). */
@@ -101,14 +104,6 @@ async function warmPool(): Promise<void> {
     // như cũ (getClient throw → builder return error result rõ ràng cho LLM).
   }
 }
-
-/**
- * T-55 #59: Reason hợp lệ để warm pool. Chỉ warm khi "startup" (session mới hoàn
- * toàn) hoặc "resume" (tiếp tục session trước — pool module-level đã clear khi
- * process exit). Skip "reload" (dev-reload pool vẫn còn) + "new"/"fork" (user
- * chủ động tạo session mới, có thể KHÔNG muốn connect ngay).
- */
-const WARM_REASONS = new Set(["startup", "resume"]);
 
 /** Bound JSON length cho log tool args (T-56 #60) — tránh bloat stderr. */
 const LOG_ARGS_CAP = 500;
@@ -176,17 +171,17 @@ function logToolCall(event: { toolName: string; args: unknown }): void {
  * @param pi Pi ExtensionAPI
  * @returns number of tools registered (0 nếu đã setup, debug aid)
  */
-export default function setup(pi: ExtensionAPI): number {
+export default function setup(pi: ExtensionAPI): void {
   // Guard: pi thực guard load 1 lần production, nhưng dev-reload có thể gọi lại.
   // Tránh leak: 2x session_shutdown handler → closeAll() gọi 2 lần song song.
-  if (setupCalled) return 0;
+  if (setupCalled) return;
   setupCalled = true;
 
   // 1. Build tools với render hooks (shallow copy, KHÔNG mutate module global)
   const tools = buildToolsWithRender();
 
   // 2. Register 102 tools (21 domain modules)
-  const toolCount = registerAllTools(pi, tools);
+  registerAllTools(pi, tools);
 
   // 3. Register unified /huly command (init/status/workspace/link/unlink)
   registerHulyCommand(pi);
@@ -221,11 +216,10 @@ export default function setup(pi: ExtensionAPI): number {
   });
 
   // 5. T-55 #59: session_start → warm pool fire-and-forget (fix first-call failure).
-  // Chỉ warm khi reason ∈ {startup, resume} — skip reload/new/fork. Handler
-  // fire-and-forget (KHÔNG await trong subscribe — pi có thể xử lý sync, warm
-  // chạy nền). warmPool swallow mọi error (best-effort).
-  pi.on("session_start", (event) => {
-    if (!WARM_REASONS.has(event.reason)) return;
+  // omp's SessionStartEvent has no `reason` field (unlike Pi), so warm
+  // unconditionally. Handler is fire-and-forget (KHÔNG await); warmPool swallows
+  // mọi error (best-effort).
+  pi.on("session_start", () => {
     void warmPool(); // fire-and-forget — KHÔNG await, KHÔNG crash setup
   });
 
@@ -240,7 +234,4 @@ export default function setup(pi: ExtensionAPI): number {
     }
   });
 
-  // 7. Skills qua package manifest `pi.skills` (declarative — pi auto-load, KHÔNG runtime)
-
-  return toolCount;
 }
