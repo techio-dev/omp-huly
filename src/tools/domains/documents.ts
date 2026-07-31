@@ -33,16 +33,11 @@ import {
 } from "./_class-refs.js";
 import { workspaceParam, limitParam, safeRemoveDoc } from "./_common.js";
 import type { TeamspaceDoc, DocumentDoc } from "./_entity-types.js";
-// generateId từ @hcengineering/core (CJS). Default/namespace import đều gãy
-// interop (giống makeCollabId T-103, pi-huly beta.19 #162) → createRequire.
-// Trả hex 24 ký tự, match doc thật + huly-mcp (KHÔNG dùng
-// `${DOCUMENT_CLASS}.<rand>` class-prefix — id hex là convention Huly).
-import { createRequire } from "node:module";
-const generateId = (
-  createRequire(import.meta.url)("@hcengineering/core") as {
-    generateId: () => string;
-  }
-).generateId;
+// generateId: Huly _id (24 hex). 0.2.4 — replicated local (src/client/huly-ids.ts)
+// thay vì import @hcengineering/core: bỏ CJS interop (mất func dưới vitest /
+// createRequire break omp loader) + bỏ `as` cast unchecked. Hex 24 = convention
+// Huly (KHÔNG dùng `${DOCUMENT_CLASS}.<rand>` class-prefix).
+import { generateId } from "../../client/huly-ids.js";
 
 /** Teamspace CRUD space = core.space.Space (root, top-level space parent). */
 const TEAMSPACE_PARENT_SPACE = SPACE_PARENT;
