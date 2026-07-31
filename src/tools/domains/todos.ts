@@ -290,7 +290,7 @@ export const tools: HulyToolDefinition[] = [
       }
       // T-79G #106: owner → user: Ref<Employee> (resolve Person).
       if (params.owner !== undefined) {
-        const ownerId = await findPersonByEmailOrName(tctx.client, params.owner);
+        const ownerId = await findPersonByEmailOrName(tctx.client, params.owner, tctx.currentUser);
         if (!ownerId) {
           return {
             content: `Owner "${params.owner}" not found (no Person matching email/name).`,

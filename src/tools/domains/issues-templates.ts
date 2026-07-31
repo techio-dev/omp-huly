@@ -461,7 +461,7 @@ export const tools: HulyToolDefinition[] = [
       // #141). Chỉ resolve khi provided (existing test không truyền → no shift).
       let assigneeRef: string | undefined;
       if (params.assignee !== undefined) {
-        assigneeRef = await findPersonByEmailOrName(tctx.client, params.assignee);
+        assigneeRef = await findPersonByEmailOrName(tctx.client, params.assignee, tctx.currentUser);
         if (!assigneeRef) {
           return {
             content: `Assignee "${params.assignee}" not found (no Person matching email/name).`,

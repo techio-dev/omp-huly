@@ -5,7 +5,7 @@ import { z } from "zod";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
 import { PERSON_CLASS, EMPLOYEE_CLASS, CHANNEL_CLASS, EMAIL_PROVIDER } from "./_class-refs.js";
 import { workspaceParam, limitParam } from "./_common.js";
-import type { HulyClient } from "../../client/client.js";
+import type { HulyClient, CurrentUser } from "../../client/client.js";
 
 /**
  * T-71: Resolve Person._id từ name (cho list_issues assignee filter).
@@ -20,6 +20,7 @@ import type { HulyClient } from "../../client/client.js";
 export async function findPersonByEmailOrName(
   client: HulyClient,
   input: string,
+  currentUser?: CurrentUser,
 ): Promise<string | undefined> {
   // T-82G #108: email resolve via Channel (provider email, value exact). Port
   // trusted contacts-shared.ts findPersonByEmailOrName step 2 (Channel exact).
@@ -34,6 +35,19 @@ export async function findPersonByEmailOrName(
         _id: (channel as { attachedTo?: string }).attachedTo,
       } as never);
       if (person) return person._id;
+    }
+    // Self-email fallback (pi-huly beta.19 #162): self-host Huly thường KHÔNG tạo
+    // Channel email cho Person (verified: 0 email Channel trên workspace test).
+    // Link account→Person thật sự là Account.uuid === Person.personUuid. Account
+    // KHÔNG queryable qua findOne ("domain not found") + getAccount() KHÔNG expose
+    // email arbitrary, nên chỉ resolve được KHI input === currentUser.email
+    // (self-assign — case phổ biến nhất, vd assignee=<email get_user_profile trả>).
+    // Arbitrary teammate email vẫn cần Channel data (documented limitation).
+    if (currentUser && input.toLowerCase() === currentUser.email.toLowerCase()) {
+      const self = await client.findOne(PERSON_CLASS, {
+        personUuid: currentUser.id,
+      } as never);
+      if (self) return self._id;
     }
   }
   // Name match (Huly Person.name = "LastName, FirstName").

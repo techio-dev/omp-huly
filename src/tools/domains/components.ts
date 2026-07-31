@@ -150,7 +150,7 @@ export const tools: HulyToolDefinition[] = [
       // T-81 #104: lead = Ref<Employee> (KHÔNG raw string). Resolve Person trước.
       let leadRef: string | undefined;
       if (params.lead !== undefined) {
-        leadRef = await findPersonByEmailOrName(tctx.client, params.lead);
+        leadRef = await findPersonByEmailOrName(tctx.client, params.lead, tctx.currentUser);
         if (!leadRef) {
           return {
             content: `Lead "${params.lead}" not found (no Person matching email/name).`,
@@ -254,7 +254,7 @@ export const tools: HulyToolDefinition[] = [
       }
       // T-81 #104: lead = Ref<Employee> (resolve Person, KHÔNG raw string).
       if (params.lead !== undefined) {
-        const leadRef = await findPersonByEmailOrName(tctx.client, params.lead);
+        const leadRef = await findPersonByEmailOrName(tctx.client, params.lead, tctx.currentUser);
         if (!leadRef) {
           return {
             content: `Lead "${params.lead}" not found (no Person matching email/name).`,
