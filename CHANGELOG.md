@@ -3,6 +3,42 @@
 All notable changes to omp-huly sẽ document ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/),
 versioning theo [Semantic Versioning](https://semver.org/).
 
+## [0.2.3] — 2026-07-31
+
+**Sync pi-huly `1.0.0-beta.19` — 4 fix từ live bug-hunt (1 CRITICAL: doc tạo qua API KHÔNG hiện web sidebar).**
+Port ngữ nghĩa (KHÔNG raw-merge — omp-huly dùng Zod + namespace `@oh-my-pi`). Adapt từ pi-huly `5e84c69`
+thành 4 thay đổi + 5 test mới (3 unit parent-param + 2 e2e-live-hunt9/hunt10).
+
+### Fixed
+
+- **create_document parent + generateId (#162, CRITICAL)**: doc tạo qua API KHÔNG set field
+  `parent` + dùng id class-prefixed (`${DOCUMENT_CLASS}.<rand>`) → bị loại khỏi web Documents
+  sidebar tree (chỉ search thấy). Fix: thêm `DOCUMENT_NO_PARENT` (`document:ids:NoParent`) marker
+  top-level + `generateId()` (hex 24, convention Huly, qua `createRequire` vì `@hcengineering/core`
+  là CJS). Thêm optional `parent` param (nested doc — resolve by _id trước, fallback title, scope
+  trong teamspace). `src/tools/domains/documents.ts` + `_class-refs.ts`.
+- **assign-by-email self resolve (#162, HIGH)**: self-host Huly thường KHÔNG tạo Channel email
+  cho Person → branch Channel không match, kể cả email của current user. `findPersonByEmailOrName`
+  thêm optional `currentUser` param; `input === currentUser.email` → `findOne(Person {personUuid:
+  currentUser.id})`. 7 call site (components/issues-core/issues-templates/todos) thread
+  `tctx.currentUser`. `src/tools/domains/contacts.ts`.
+- **makeCollabId CJS interop (#162)**: `@hcengineering/core` CJS — default import (`import core`)
+  → `core.makeCollabId` undefined dưới vitest (prod dist OK). Fix: `createRequire(import.meta.url)`
+  trả `module.exports` nguyên thẳng → đúng ở CẢ vitest lẫn dist. `src/client/client.ts`
+  (textCore/textMarkdown default import giữ nguyên — work ở cả 2 môi trường, surgical).
+
+### Tests
+
+- 3 unit test parent-param trong `documents.test.ts` (undefined→NoParent, title→resolve nested,
+  not-found→isError).
+- Port `e2e-live-hunt9.test.ts` + `e2e-live-hunt10.test.ts` (gated `HULY_E2E_PROJECT`, namespace
+  `@oh-my-pi/pi-coding-agent`).
+
+### Verify
+
+- `tsc --noEmit` clean. `vitest run`: **692 passed | 103 skipped** (hunt9/hunt10 skip khi chưa set
+  `HULY_E2E_PROJECT`).
+
 ## [0.2.2] — 2026-07-31
 
 **Hotfix sync pi-huly `1.0.0-beta.18` — fix ESM/CJS interop crash (#162, CRITICAL).**

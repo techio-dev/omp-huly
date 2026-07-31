@@ -26,7 +26,7 @@ vi.mock("../../../client/errors.js", () => ({
 
 import { getClient } from "../../../client/pool.js";
 import { tools } from "../documents.js";
-import { TEAMSPACE_CLASS, DOCUMENT_CLASS } from "../_class-refs.js";
+import { TEAMSPACE_CLASS, DOCUMENT_CLASS, DOCUMENT_NO_PARENT } from "../_class-refs.js";
 
 const ctx = {
   hasUI: false,
@@ -309,6 +309,88 @@ describe("T-66: document CRUD ENABLED (DOCUMENT_CLASS + space scoping)", () => {
       expect.objectContaining({ title: "Empty", content: null }),
       expect.any(String),
     );
+  });
+  // T-doc-parent (pi-huly beta.19 #162): parent param → sidebar visibility.
+  it("create_document WITHOUT parent → createDoc parent=DOCUMENT_NO_PARENT (top-level, hiện sidebar)", async () => {
+    const client = makeClient();
+    client.findOne = vi.fn().mockResolvedValue({ _id: "ts-1", name: "Docs" });
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_create_document");
+    const result = await tool.execute(
+      "tc1",
+      { teamspace: "ts-1", title: "Top" },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(client.createDoc).toHaveBeenCalledWith(
+      DOCUMENT_CLASS,
+      "ts-1",
+      expect.objectContaining({ title: "Top", parent: DOCUMENT_NO_PARENT }),
+      expect.any(String),
+    );
+  });
+
+  it("create_document WITH parent (title) → resolve parent doc, parent=parentDoc._id (nested)", async () => {
+    const client = makeClient();
+    // findOne phân biệt theo query: teamspace vs parent byId vs parent byTitle.
+    client.findOne = vi
+      .fn()
+      .mockImplementation((_cls: unknown, query: { _id?: string; title?: string }) => {
+        if (query._id === "ts-1") return Promise.resolve({ _id: "ts-1", name: "Docs" });
+        if (query.title === "Parent")
+          return Promise.resolve({ _id: "doc-parent-1", title: "Parent" });
+        return Promise.resolve(undefined); // byId miss (parent truyền title, KHÔNG _id)
+      });
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_create_document");
+    const result = await tool.execute(
+      "tc1",
+      { teamspace: "ts-1", title: "Child", parent: "Parent" },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(client.createDoc).toHaveBeenCalledWith(
+      DOCUMENT_CLASS,
+      "ts-1",
+      expect.objectContaining({ title: "Child", parent: "doc-parent-1" }),
+      expect.any(String),
+    );
+    // byId lookup phải scope theo teamspace (KHÔNG cross-teamspace leak) — guard
+    // regression nếu `space: ts._id` filter bị bỏ khỏi byId query.
+    const byIdCall = client.findOne.mock.calls.find(
+      (c) => c[1]?._id === "Parent" && c[1]?.space === "ts-1",
+    );
+    expect(byIdCall).toBeTruthy();
+  });
+
+  it("create_document WITH parent not found → isError, NO createDoc", async () => {
+    const client = makeClient();
+    client.findOne = vi
+      .fn()
+      .mockResolvedValueOnce({ _id: "ts-1", name: "Docs" })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_create_document");
+    const result = await tool.execute(
+      "tc1",
+      { teamspace: "ts-1", title: "Orphan", parent: "Missing" },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(client.createDoc).not.toHaveBeenCalled();
   });
 
   it("edit_document content mode → updateMarkup (T-103 #156: KHÔNG uploadMarkup+updateDoc)", async () => {

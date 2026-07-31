@@ -92,6 +92,11 @@ export const DOCUMENT_SNAPSHOT_CLASS = classRef("document:class:DocumentSnapshot
 // document plugin — same string-literal pattern as class refs.
 export const TEAMSPACE_ICON = "document:icon:Teamspace";
 export const DEFAULT_TEAMSPACE_TYPE = "document:spaceType:DefaultTeamspaceType";
+// T-doc-parent: top-level Document parent marker. Web Documents tree query
+// top-level = { parent: "document:ids:NoParent" }. Doc KHÔNG set field này (absent)
+// hay set "" → bị loại khỏi sidebar tree (chỉ search thấy). = documentPlugin.ids.NoParent.
+// Verified vs doc thật + huly-mcp createDocument. Port pi-huly beta.19 (#162).
+export const DOCUMENT_NO_PARENT = "document:ids:NoParent";
 // Top-level spaces (Teamspace/Drive/Project) dùng core.space.Space làm parent.
 export const SPACE_PARENT = spaceRef("core:space:Space");
 

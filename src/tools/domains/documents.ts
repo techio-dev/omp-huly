@@ -29,9 +29,20 @@ import {
   DEFAULT_TEAMSPACE_TYPE,
   SPACE_PARENT,
   DOCUMENT_CLASS,
+  DOCUMENT_NO_PARENT,
 } from "./_class-refs.js";
 import { workspaceParam, limitParam, safeRemoveDoc } from "./_common.js";
 import type { TeamspaceDoc, DocumentDoc } from "./_entity-types.js";
+// generateId từ @hcengineering/core (CJS). Default/namespace import đều gãy
+// interop (giống makeCollabId T-103, pi-huly beta.19 #162) → createRequire.
+// Trả hex 24 ký tự, match doc thật + huly-mcp (KHÔNG dùng
+// `${DOCUMENT_CLASS}.<rand>` class-prefix — id hex là convention Huly).
+import { createRequire } from "node:module";
+const generateId = (
+  createRequire(import.meta.url)("@hcengineering/core") as {
+    generateId: () => string;
+  }
+).generateId;
 
 /** Teamspace CRUD space = core.space.Space (root, top-level space parent). */
 const TEAMSPACE_PARENT_SPACE = SPACE_PARENT;
@@ -356,6 +367,13 @@ export const tools: HulyToolDefinition[] = [
       teamspace: z.string(),
       title: z.string(),
       content: z.optional(z.string().describe("Markdown content.")),
+      parent: z.optional(
+        z
+          .string()
+          .describe(
+            "Parent document title or _id trong cùng teamspace (tạo nested doc). Bỏ qua = top-level.",
+          ),
+      ),
     }),
     async handler(params, tctx) {
       const ts = await tctx.client.findOne(TEAMSPACE_CLASS, { _id: params.teamspace });
@@ -366,8 +384,33 @@ export const tools: HulyToolDefinition[] = [
           details: { teamspace: params.teamspace },
         };
       }
-      // Generate doc id for uploadMarkup (content blob needs id before createDoc).
-      const docId = `${DOCUMENT_CLASS as string}.${Math.random().toString(36).slice(2, 12)}`;
+      // T-doc-parent: resolve parent doc (nếu có) — by _id trước, fallback title,
+      // scope trong teamspace. Match huly-mcp findByNameOrId pattern.
+      let parentRef: string = DOCUMENT_NO_PARENT;
+      if (params.parent !== undefined) {
+        const byId = await tctx.client.findOne<DocumentDoc>(DOCUMENT_CLASS, {
+          _id: params.parent as never,
+          space: ts._id as never,
+        } as never);
+        const parentDoc =
+          byId ??
+          (await tctx.client.findOne<DocumentDoc>(DOCUMENT_CLASS, {
+            title: params.parent,
+            space: ts._id as never,
+          } as never));
+        if (!parentDoc) {
+          return {
+            content: `Parent document "${params.parent}" not found in teamspace "${
+              (ts as { name?: string }).name ?? params.teamspace
+            }" (by _id or title).`,
+            isError: true,
+            details: { parent: params.parent, teamspace: ts._id },
+          };
+        }
+        parentRef = parentDoc._id;
+      }
+      // T-doc-parent: generateId() (hex 24, convention Huly) — KHÔNG `${DOCUMENT_CLASS}.<rand>`.
+      const docId = generateId();
       let contentRef: unknown = null;
       if (params.content && params.content.trim() !== "") {
         contentRef = await tctx.client.uploadMarkup(
@@ -384,12 +427,17 @@ export const tools: HulyToolDefinition[] = [
         {
           title: params.title,
           content: contentRef,
+          // T-doc-parent: top-level marker hoặc parent doc._id (nested).
+          // Web Documents tree query top-level = { parent: "document:ids:NoParent" }.
+          parent: parentRef,
         } as never,
         docId as never,
       );
       return {
-        content: `Created document "${params.title}" in teamspace "${(ts as { name?: string }).name ?? params.teamspace}".`,
-        details: { id: newId, title: params.title, teamspace: ts._id },
+        content: `Created document "${params.title}" in teamspace "${
+          (ts as { name?: string }).name ?? params.teamspace
+        }"${params.parent ? ` under "${params.parent}"` : " (top-level)"}.`,
+        details: { id: newId, title: params.title, teamspace: ts._id, parent: parentRef },
       };
     },
   }),
