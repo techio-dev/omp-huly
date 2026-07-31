@@ -3,7 +3,41 @@
 All notable changes to omp-huly sẽ document ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/),
 versioning theo [Semantic Versioning](https://semver.org/).
 
-## [0.2.3] — 2026-07-31
+## [0.2.4] — 2026-07-31
+
+**Hotfix — fix load regression 0.2.3 (omp loader KHÔNG resolve createRequire) + bỏ cast CJS unchecked.**
+0.2.3 port beta.19 dùng `createRequire(import.meta.url)("@hcengineering/core")` cho `makeCollabId`
++ `generateId` → omp loader throw `ResolveMessage: Cannot find module '@hcengineering/core'`
+khi load extension (createRequire sinh runtime `require()` mà loader KHÔNG resolve, khác static
+ESM import của external). Cùng lúc static default import mất 2 func dưới vitest/vite transform.
+
+### Fixed
+
+- **load regression (CRITICAL)**: `makeCollabId` + `generateId` replicated LOCAL trong
+  `src/client/huly-ids.ts` (pure TS, zero CJS dependency) thay vì import `@hcengineering/core`.
+  Triệt tiêu cả lớp vấn đề CJS interop (đã gây: #162 named-export crash → beta.18 default-import
+  → beta.19 createRequire → break omp loader). Impl verified vs `@hcengineering/core@0.7.423`
+  (`lib/utils.js` generateId = 24 hex; `lib/collaboration.js` makeCollabId = plain object).
+  Dist giờ chỉ còn 3 static import `@hcengineering/{api-client,text-core,text-markdown}` (resolve
+  OK qua omp loader, giống 0.2.2). `src/client/client.ts` + `src/tools/domains/documents.ts`.
+
+### Changed
+
+- **bỏ `as` cast unchecked**: `(core as unknown as {...}).makeCollabId` /
+  `.generateId` loại bỏ hoàn toàn (rule `ts-no-inline-cast-access`). `jsonToMarkup`
+  (text-core) giữ default import + cast — func phức tạp, pre-existing beta.18, work cả 2 môi trường.
+
+### Tests
+
+- `src/client/__tests__/huly-ids.test.ts` — invariant 24-hex (`/^[0-9a-f]{24}$/`), uniqueness
+  (1000 id không trùng), timestamp prefix, makeCollabId shape.
+
+### Verify
+
+- `tsc --noEmit` clean. `vitest run`: **696 passed | 103 skipped**. `rolldown build` OK.
+- dist grep: 0 `@hcengineering/core` import, 0 `createRequire` cho hcengineering.
+
+## [0.2.3] — 2026-07-31 (YANKED — load regression, thay bằng 0.2.4)
 
 **Sync pi-huly `1.0.0-beta.19` — 4 fix từ live bug-hunt (1 CRITICAL: doc tạo qua API KHÔNG hiện web sidebar).**
 Port ngữ nghĩa (KHÔNG raw-merge — omp-huly dùng Zod + namespace `@oh-my-pi`). Adapt từ pi-huly `5e84c69`

@@ -35,25 +35,17 @@ import type {
   WithLookup,
   WithMarkup,
 } from "@hcengineering/api-client";
-// T-103 #156 → fix interop (pi-huly beta.19 #162): makeCollabId (core) +
-// jsonToMarkup (text-core) exist runtime nhưng KHÔNG trong .d.ts.
-// @hcengineering/core là CJS, và 2 cách import ESM đều gãy ở 1 môi trường:
-// default import (`import core`) → core.makeCollabId undefined dưới vitest;
-// namespace (`import * as core`) → undefined dưới plain Node/dist.
-// createRequire(import.meta.url) trả module.exports nguyên thẳng → đúng ở
-// CẢ vitest lẫn production/dist. (textCore/textMarkdown default import hiện work
-// ở cả 2 môi trường — để nguyên, surgical.)
-import { createRequire } from "node:module";
+// T-103 #156: makeCollabId + jsonToMarkup exist runtime nhưng KHÔNG trong .d.ts.
+// 0.2.4 fix: makeCollabId replicated local (src/client/huly-ids.ts) — triệt tiêu
+// CJS interop (static import mất func dưới vitest; createRequire break omp loader)
+// + bỏ `as` cast unchecked. jsonToMarkup (text-core) phức tạp → giữ default import
+// + cast (pre-existing beta.18, work ở cả vitest + dist).
+import { makeCollabId } from "./huly-ids.js";
 import textCore from "@hcengineering/text-core";
 import textMarkdown from "@hcengineering/text-markdown";
-const cjsRequire = createRequire(import.meta.url);
-const core = cjsRequire("@hcengineering/core") as {
-  makeCollabId: (cls: string, id: string, attr: string) => unknown;
-};
 const { connect, connectRest, connectStorage, createRestTxOperations, getWorkspaceToken } =
   apiClient;
 const { markdownToMarkup } = textMarkdown;
-const { makeCollabId } = core;
 const jsonToMarkup = (textCore as unknown as { jsonToMarkup: (j: unknown) => string }).jsonToMarkup;
 import { mapError } from "./errors.js";
 import { DEFAULT_UPSTREAM_NOISE_PATTERNS, runWithConsoleFilter } from "./console-filter.js";
