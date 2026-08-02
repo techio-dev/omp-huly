@@ -51,6 +51,7 @@ function makeClient() {
     addCollection: vi.fn().mockResolvedValue("internal-id-abc"),
     fetchMarkup: vi.fn(),
     uploadMarkup: vi.fn().mockResolvedValue({ blob: "ref" }),
+    updateMarkup: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -629,8 +630,8 @@ describe("T-47: update_issue status persist + assignee leak (#36)", () => {
   });
 });
 
-describe("T-72: update_issue description MarkupBlobRef (uploadMarkup+updateDoc, no updateMarkup)", () => {
-  it("description mới (issue chưa có description) → uploadMarkup + ops.description = ref", async () => {
+describe("T-72 #80: update_issue description — updateMarkup (existing) vs uploadMarkup (new)", () => {
+  it("issue CHƯA có description → uploadMarkup tạo blob + ops.description = ref", async () => {
     const client = makeClient();
     client.findOne = vi
       .fn()
@@ -655,11 +656,12 @@ describe("T-72: update_issue description MarkupBlobRef (uploadMarkup+updateDoc, 
       "# new desc",
       "markdown",
     );
+    expect(client.updateMarkup).not.toHaveBeenCalled();
     const ops = client.updateDoc.mock.calls[0]?.[3] as Record<string, unknown>;
     expect(ops.description).toEqual({ blob: "new-ref" });
   });
 
-  it("description update (issue đã có description) → uploadMarkup + updateDoc (KHÔNG updateMarkup)", async () => {
+  it("issue ĐÃ CÓ description → updateMarkup edit in-place (KHÔNG uploadMarkup)", async () => {
     const client = makeClient();
     client.findOne = vi.fn().mockResolvedValueOnce({
       _id: "i1",
@@ -667,7 +669,6 @@ describe("T-72: update_issue description MarkupBlobRef (uploadMarkup+updateDoc, 
       identifier: "PD-1",
       description: { blob: "existing-ref" },
     });
-    client.uploadMarkup = vi.fn().mockResolvedValue({ blob: "new-ref" });
     vi.mocked(getClient).mockResolvedValue(client as never);
 
     const tool = findTool("huly_update_issue");
@@ -682,16 +683,51 @@ describe("T-72: update_issue description MarkupBlobRef (uploadMarkup+updateDoc, 
     expect(result.isError).toBeUndefined();
     expect(result.details).toMatchObject({ updated: true });
     expect((result.details as { fields: string[] }).fields).toContain("description");
-    // Library KHÔNG có updateMarkup → luôn uploadMarkup + updateDoc.
-    expect(client.uploadMarkup).toHaveBeenCalledWith(
+    // Existing description → updateMarkup (updateContent rpc) edit content in-place.
+    // uploadMarkup/createMarkup chỉ tạo initial version — KHÔNG update doc tồn tại
+    // (repro VPSM-58/34: uploadMarkup no-op, description stale dù báo success).
+    expect(client.updateMarkup).toHaveBeenCalledWith(
       ISSUE_CLASS,
       "i1",
       "description",
       "# updated",
       "markdown",
     );
-    const ops = client.updateDoc.mock.calls[0]?.[3] as Record<string, unknown>;
-    expect(ops.description).toEqual({ blob: "new-ref" });
+    expect(client.uploadMarkup).not.toHaveBeenCalled();
+    // T-97: updateMarkup path → updateDoc KHÔNG gọi (content update qua collaborator,
+    // KHÔNG ghi description vào TxUpdateDoc — mirror trusted @firfi/huly-mcp pattern).
+    expect(client.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it("issue có description + updateMarkup unavailable (REST) → fallback uploadMarkup", async () => {
+    const client = makeClient();
+    client.updateMarkup = undefined as never;
+    client.findOne = vi.fn().mockResolvedValueOnce({
+      _id: "i1",
+      space: "sp1",
+      identifier: "PD-1",
+      description: { blob: "existing-ref" },
+    });
+    client.uploadMarkup = vi.fn().mockResolvedValue({ blob: "fallback-ref" });
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_update_issue");
+    await tool.execute(
+      "tc1",
+      { identifier: "PD-1", description: "# rest" },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    // REST transport: updateMarkup không có → uploadMarkup (createContent) fallback.
+    expect(client.uploadMarkup).toHaveBeenCalledWith(
+      ISSUE_CLASS,
+      "i1",
+      "description",
+      "# rest",
+      "markdown",
+    );
   });
 });
 

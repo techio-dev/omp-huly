@@ -264,7 +264,8 @@ function makeWsClient(
     addCollection: (...args) => client.addCollection(...args),
     createMixin: (...args) => client.createMixin(...args),
     // T-41: PlatformClient có fetchMarkup/uploadMarkup built-in (MarkupOperations).
-    // Library KHÔNG có updateMarkup — edit = uploadMarkup + updateDoc.
+    // updateMarkup impl ở dưới (markdown→markup + collaborator.updateMarkup) — edit
+    // existing markup content in-place. uploadMarkup (createMarkup) chỉ tạo initial version.
     fetchMarkup: (...args) => client.fetchMarkup(...args),
     uploadMarkup: (...args) => client.uploadMarkup(...args),
     // T-103 #156: updateMarkup qua collaborator.updateMarkup (updateContent rpc).

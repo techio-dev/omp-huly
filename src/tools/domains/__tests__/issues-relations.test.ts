@@ -521,49 +521,100 @@ describe("T-61: list_issue_relations — 3 hướng rõ ràng + reverse query ch
   });
 });
 
-// T-60 #55 #64: link/unlink_document_to_issue honest-unavailable — DOCUMENT_CLASS
-// interface orphan (KHÔNG register runtime). Cùng verdict T-60 search domain.
-describe("T-60: link/unlink_document_to_issue honest-unavailable (Document orphan)", () => {
-  it("link_document_to_issue → isError + KHÔNG gọi findOne/updateDoc", async () => {
+// T-97: link/unlink_document_to_issue RE-ENABLED — Document registered (T-65/T-66
+// supersedes T-58/T-60 interface-orphan). Link = $push Issue.relations
+// { _id: doc, _class: document:class:Document }. Idempotent.
+describe("T-97: link/unlink_document_to_issue (Document registered — re-enabled)", () => {
+  const doc = { _id: "doc-1", name: "Design Doc" };
+  const issue = { _id: "i1", space: "sp1", identifier: "PD-1", relations: [] as unknown[] };
+
+  it("link: issue+doc found → $push relations { _id, _class: document:class:Document }", async () => {
     const client = makeClient();
+    client.findOne = vi.fn().mockImplementation((_c, q) => {
+      if ("identifier" in q) return Promise.resolve(issue);
+      return Promise.resolve(doc); // resolveDocument (byId or byName)
+    });
     vi.mocked(getClient).mockResolvedValue(client as never);
 
     const tool = findTool("huly_link_document_to_issue");
-    const result = await tool.execute(
-      "tc1",
-      { identifier: "PD-1", document: "doc-1" },
-      undefined,
-      undefined,
-      ctx,
-    );
+    const result = await tool.execute("tc1", { identifier: "PD-1", document: "doc-1" }, undefined, undefined, ctx);
 
-    expect(result.isError).toBe(true);
-    expect(client.findOne).not.toHaveBeenCalled();
-    expect(client.updateDoc).not.toHaveBeenCalled();
-    const text = result.content[0]?.text ?? "";
-    expect(text).toMatch(/KHÔNG khả dụng|interface orphan/i);
-    expect(text).toContain("tracker:class:Document");
+    expect(result.isError).toBeUndefined();
+    expect(client.updateDoc).toHaveBeenCalledWith(
+      "tracker:class:Issue", "sp1", "i1",
+      { $push: { relations: { _id: "doc-1", _class: "document:class:Document" } } },
+    );
   });
 
-  it("unlink_document_to_issue → isError + KHÔNG gọi findOne/updateDoc", async () => {
+  it("link: issue not found → isError + KHÔNG updateDoc", async () => {
     const client = makeClient();
+    client.findOne = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_link_document_to_issue");
+    const result = await tool.execute("tc1", { identifier: "PD-1", document: "doc-1" }, undefined, undefined, ctx);
+
+    expect(result.isError).toBe(true);
+    expect(client.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it("link: doc not found → isError + KHÔNG updateDoc", async () => {
+    const client = makeClient();
+    client.findOne = vi.fn().mockImplementation((_c, q) =>
+      "identifier" in q ? Promise.resolve(issue) : Promise.resolve(undefined));
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_link_document_to_issue");
+    const result = await tool.execute("tc1", { identifier: "PD-1", document: "missing" }, undefined, undefined, ctx);
+
+    expect(result.isError).toBe(true);
+    expect(client.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it("link: already linked → idempotent no-op (KHÔNG updateDoc)", async () => {
+    const client = makeClient();
+    const linked = { ...issue, relations: [{ _id: "doc-1", _class: "document:class:Document" }] };
+    client.findOne = vi.fn().mockImplementation((_c, q) =>
+      "identifier" in q ? Promise.resolve(linked) : Promise.resolve(doc));
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_link_document_to_issue");
+    const result = await tool.execute("tc1", { identifier: "PD-1", document: "doc-1" }, undefined, undefined, ctx);
+
+    expect(result.isError).toBeUndefined();
+    expect((result.details as { idempotent?: boolean }).idempotent).toBe(true);
+    expect(client.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it("unlink: linked → $pull relations { _id: doc }", async () => {
+    const client = makeClient();
+    const linked = { ...issue, relations: [{ _id: "doc-1", _class: "document:class:Document" }] };
+    client.findOne = vi.fn().mockImplementation((_c, q) =>
+      "identifier" in q ? Promise.resolve(linked) : Promise.resolve(doc));
     vi.mocked(getClient).mockResolvedValue(client as never);
 
     const tool = findTool("huly_unlink_document_to_issue");
-    const result = await tool.execute(
-      "tc1",
-      { identifier: "PD-1", document: "doc-1" },
-      undefined,
-      undefined,
-      ctx,
-    );
+    const result = await tool.execute("tc1", { identifier: "PD-1", document: "doc-1" }, undefined, undefined, ctxConfirmed);
 
-    expect(result.isError).toBe(true);
+    expect(result.isError).toBeUndefined();
+    expect(client.updateDoc).toHaveBeenCalledWith(
+      "tracker:class:Issue", "sp1", "i1",
+      { $pull: { relations: { _id: "doc-1" } } },
+    );
+  });
+
+  it("unlink: not linked → idempotent no-op (KHÔNG updateDoc)", async () => {
+    const client = makeClient();
+    client.findOne = vi.fn().mockImplementation((_c, q) =>
+      "identifier" in q ? Promise.resolve(issue) : Promise.resolve(doc));
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_unlink_document_to_issue");
+    const result = await tool.execute("tc1", { identifier: "PD-1", document: "doc-1" }, undefined, undefined, ctxConfirmed);
+
+    expect(result.isError).toBeUndefined();
+    expect((result.details as { idempotent?: boolean }).idempotent).toBe(true);
     expect(client.updateDoc).not.toHaveBeenCalled();
-    expect(result.details).toMatchObject({
-      reason: "interface_orphan",
-      useClass: "tracker:class:Document",
-    });
   });
 });
 

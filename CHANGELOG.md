@@ -3,6 +3,69 @@
 All notable changes to omp-huly sẽ document ở đây. Format theo [Keep a Changelog](https://keepachangelog.com/),
 versioning theo [Semantic Versioning](https://semver.org/).
 
+## [0.2.6] — 2026-08-02
+
+**Hotfix — T-97 root-cause description persistence + re-enable link/unlink_document_to_issue.**
+
+### Fixed
+
+- **description update stale trên entity đã CÓ description (T-97 root cause, 3 tool)**: nhánh
+  `updateMarkup` (updateContent rpc) ĐÃ chạy đúng nhưng tool vẫn ghi `ops.description = existingRef`
+  ngược vào `updateDoc` (TxUpdateDoc) — TxUpdateDoc trên description field trigger server re-process,
+  reset collaborator content → description stale dù `updateMarkup` báo success. **Mirror trusted
+  `@firfi/huly-mcp`** (calendar.ts:321, cards.ts:350): `updateMarkup` xong return {} — KHÔNG ghi
+  description vào updateDoc. Fix: bỏ write-back, track `descUpdated` riêng cho success message, skip
+  `updateDoc` khi chỉ description (content đã update qua collaborator). Áp dụng cho `update_issue`,
+  `update_component`, `update_todo`. Supersede 0.2.5 approach (`ops.description = existingRef`).
+  `src/tools/domains/{issues-core,components,todos}.ts`.
+
+### Added
+
+- **re-enable `link_document_to_issue` / `unlink_document_to_issue`**: T-60 mark honest-unavailable
+  vì `tracker:class:Document` "interface orphan" — nhưng T-65/T-66 ĐÃ register `@hcengineering/document`
+  plugin (DOCUMENT_CLASS = `document:class:Document`), CRUD chạy được. 2 tool link/unlink bị quên
+  re-enable cùng đợt T-66. Giờ implement thật: link = `$push Issue.relations { _id, _class: DOCUMENT_CLASS }`
+  (unidirectional Issue→Document, khớp Huly UI Relations panel + `@firfi/huly-mcp` document-relations.ts);
+  unlink = `$pull`. Document resolve title-or-_id. Idempotent. `src/tools/domains/issues-relations.ts`.
+
+### Tests
+
+- Unit issues-relations: 6 test link/unlink (link success/not-found×2/idempotent + unlink
+  success/idempotent) thay 2 honest-unavailable test cũ. +4 test net (704 total).
+
+### Known limitations
+
+- T-97 fix + link/unlink **chưa live-verify** trên workspace thật (mock tests pass). Cần chạy
+  `HULY_E2E_PROJECT=<ws> pnpm vitest run e2e-live-hunt8.test.ts` + smoke link/unlink trước release
+  stable.
+
+## [0.2.5] — 2026-08-01
+
+**Hotfix — fix update_issue/todo/component description không persist trên issue đã có description.**
+
+### Fixed
+
+- **description update silent no-persist (VPSM-58/34 class bug)**: `update_issue`,
+  `update_todo`, `update_component` dùng `uploadMarkup`/`createMarkup` (createContent rpc)
+  vô điều kiện cho `description`. `createMarkup` chỉ tạo **initial version** của collaborative
+  doc — **no-op khi doc đã tồn tại** (#156 e2e-verified) → update description trên entity đã CÓ
+  description không đổi content nhưng tool vẫn báo "Updated ... description". Giờ branch theo
+  description tồn tại: đã có → `updateMarkup` (updateContent rpc, edit content in-place, ref
+  unchanged); chưa có → `uploadMarkup` (createMarkup, tạo blob + swap ref). REST transport
+  (không có updateMarkup) → fallback `uploadMarkup`. `src/tools/domains/{issues-core,todos,components}.ts`.
+  R11 test cũ ("description persists") chỉ cover first-write (create-from-nothing) → trượt bug;
+  repro ban đầu lọt cùng lỗ hổng — phải thêm intermediate-verify (get ngay sau create) mới bắt được.
+- **desc-only update message**: nhánh `updateMarkup` giờ set `ops.description = existingRef` để
+  guard "No fields to update" + success message đúng (trước đó desc-only update báo sai "No fields
+  to update" dù content đã update).
+
+### Tests
+
+- Unit: `issues-core.test.ts` / `t79g-todos-completeness.test.ts` / `components.test.ts` — thêm
+  coverage `updateMarkup` (existing) vs `uploadMarkup` (new) + REST fallback cho cả 3 tool.
+- Live regression: `e2e-live-hunt8.test.ts` R11 — "update over EXISTING description persists"
+  (verify live GREEN).
+
 ## [0.2.4] — 2026-07-31
 
 **Hotfix — fix load regression 0.2.3 (omp loader KHÔNG resolve createRequire) + bỏ cast CJS unchecked.**

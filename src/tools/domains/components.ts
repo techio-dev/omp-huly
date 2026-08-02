@@ -241,16 +241,34 @@ export const tools: HulyToolDefinition[] = [
           };
         ops.label = params.label;
       }
-      // T-103 #162: description = MarkupBlobRef → uploadMarkup ref (mirror update_issue).
+      // T-97: description = MarkupBlobRef. Component ĐÃ CÓ description → updateMarkup
+      // (updateContent rpc) edit in-place. KHÔNG ghi description vào ops — mirror trusted
+      // @firfi/huly-mcp: updateMarkup xong KHÔNG updateDoc description field (TxUpdateDoc
+      // trên description → server reset collaborator content → stale). CHƯA có → uploadMarkup
+      // tạo blob + swap ref. Track descUpdated riêng cho success message.
+      let descUpdated = false;
       if (params.description !== undefined) {
-        const ref = await tctx.client.uploadMarkup(
-          COMPONENT_CLASS,
-          c._id,
-          "description",
-          params.description,
-          "markdown",
-        );
-        ops.description = ref;
+        const existingDesc =
+          typeof c === "object" && "description" in c ? c.description : undefined;
+        if (existingDesc != null && typeof tctx.client.updateMarkup === "function") {
+          await tctx.client.updateMarkup(
+            COMPONENT_CLASS,
+            c._id,
+            "description",
+            params.description,
+            "markdown",
+          );
+          descUpdated = true;
+        } else {
+          ops.description = await tctx.client.uploadMarkup(
+            COMPONENT_CLASS,
+            c._id,
+            "description",
+            params.description,
+            "markdown",
+          );
+          descUpdated = true;
+        }
       }
       // T-81 #104: lead = Ref<Employee> (resolve Person, KHÔNG raw string).
       if (params.lead !== undefined) {
@@ -264,14 +282,19 @@ export const tools: HulyToolDefinition[] = [
         }
         ops.lead = leadRef;
       }
-      if (Object.keys(ops).length === 0) {
+      // T-97: updateMarkup path (descUpdated + empty ops) → skip updateDoc.
+      if (Object.keys(ops).length === 0 && !descUpdated) {
         return { content: "No fields to update.", details: { updated: false } };
       }
-      const updResult = await safeUpdateDoc(tctx.client, COMPONENT_CLASS, c, ops);
-      if (!updResult.ok) return updResult.error;
+      if (Object.keys(ops).length > 0) {
+        const updResult = await safeUpdateDoc(tctx.client, COMPONENT_CLASS, c, ops);
+        if (!updResult.ok) return updResult.error;
+      }
+      const fields = Object.keys(ops);
+      if (descUpdated && !fields.includes("description")) fields.push("description");
       return {
         content: `Updated component ${params.component}.`,
-        details: { updated: true, fields: Object.keys(ops) },
+        details: { updated: true, fields },
       };
     },
   }),

@@ -26,6 +26,7 @@ vi.mock("../../../client/errors.js", () => ({
 
 import { getClient } from "../../../client/pool.js";
 import { tools } from "../components.js";
+import { COMPONENT_CLASS } from "../_class-refs.js";
 
 const ctx = {
   hasUI: false,
@@ -42,6 +43,7 @@ function makeClient() {
     updateDoc: vi.fn().mockResolvedValue(undefined),
     removeDoc: vi.fn().mockResolvedValue(undefined),
     uploadMarkup: vi.fn().mockResolvedValue({ blob: "ref" }),
+    updateMarkup: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -163,5 +165,61 @@ describe("T-103 #160: create_component label guard (non-empty)", () => {
     );
     expect(r.isError).toBe(true);
     expect(client.createDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe("T-103 #162: update_component description — updateMarkup (existing) vs uploadMarkup (new)", () => {
+  it("component ĐÃ CÓ description → updateMarkup edit in-place (KHÔNG uploadMarkup)", async () => {
+    const client = makeClient();
+    // findOne #1: getProjectSpace (project._id → space); #2: component lookup.
+    client.findOne = vi
+      .fn()
+      .mockResolvedValueOnce({ _id: "proj-1", identifier: "PD" })
+      .mockResolvedValueOnce({ _id: "c1", space: "proj-1", description: "existing-ref" });
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const r = await findTool("huly_update_component").execute(
+      "t1",
+      { component: "c1", description: "new text" },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    expect(r.isError).toBeUndefined();
+    expect(client.updateMarkup).toHaveBeenCalledWith(
+      COMPONENT_CLASS,
+      "c1",
+      "description",
+      "new text",
+      "markdown",
+    );
+    expect(client.uploadMarkup).not.toHaveBeenCalled();
+  });
+
+  it("component CHƯA có description → uploadMarkup tạo blob + swap ref", async () => {
+    const client = makeClient();
+    client.findOne = vi
+      .fn()
+      .mockResolvedValueOnce({ _id: "proj-1", identifier: "PD" })
+      .mockResolvedValueOnce({ _id: "c1", space: "proj-1" });
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    await findTool("huly_update_component").execute(
+      "t1",
+      { component: "c1", description: "first" },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    expect(client.uploadMarkup).toHaveBeenCalledWith(
+      COMPONENT_CLASS,
+      "c1",
+      "description",
+      "first",
+      "markdown",
+    );
+    expect(client.updateMarkup).not.toHaveBeenCalled();
   });
 });

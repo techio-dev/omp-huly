@@ -168,6 +168,52 @@ d("R11 update_issue field persistence", () => {
       );
     }
   });
+  // Regression: update_issue description on an issue that ALREADY has a description.
+  // uploadMarkup/createMarkup chỉ tạo initial version — no-op khi doc tồn tại →
+  // phải dùng updateMarkup (updateContent). Bug VPSM-58/34: báo success nhưng stale.
+  // (R11 case trên chỉ cover create-from-nothing — first-write — trượt bug này.)
+  it("description update over EXISTING description persists (updateMarkup path)", async () => {
+    const ci = await ft("create_issue").execute(
+      "a",
+      {
+        project,
+        title: `r11upd-${Date.now()}`,
+        description: `ORIG-${Date.now()}`,
+        priority: "low",
+      },
+      undefined,
+      undefined,
+      ctx(),
+    );
+    const id = det(ci.details, "identifier");
+    try {
+      const marker = `UPD-${Date.now()}`;
+      await ft("update_issue").execute(
+        "a",
+        { project, identifier: id, description: marker },
+        undefined,
+        undefined,
+        ctx(),
+      );
+      const g = await ft("get_issue").execute(
+        "a",
+        { project, identifier: id },
+        undefined,
+        undefined,
+        ctx(),
+      );
+      const desc = String(det(g.details, "description") ?? "");
+      expect(desc, `existing description not overwritten (got: "${desc}")`).toContain(marker);
+    } finally {
+      await ft("delete_issue").execute(
+        "a",
+        { project, identifier: id },
+        undefined,
+        undefined,
+        ctx(),
+      );
+    }
+  });
 });
 
 d("R11 update_component description+lead persistence", () => {

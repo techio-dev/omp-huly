@@ -93,8 +93,8 @@ describe("T-79G: update_todo owner/priority/visibility (#106)", () => {
   });
 });
 
-describe("T-79G #162: update_todo description uploadMarkup ref", () => {
-  it("description → uploadMarkup ref + ops.description (KHÔNG updateMarkup)", async () => {
+describe("T-79G #162: update_todo description — updateMarkup (existing) vs uploadMarkup (new)", () => {
+  it("todo ĐÃ CÓ description → updateMarkup edit in-place (KHÔNG uploadMarkup)", async () => {
     const client = makeClient();
     client.findOne = vi.fn().mockResolvedValueOnce({
       _id: "t1",
@@ -112,21 +112,21 @@ describe("T-79G #162: update_todo description uploadMarkup ref", () => {
       ctx,
     );
 
-    // #162: uploadMarkup (createContent rpc) creates new blob + swap ref via updateDoc.
-    // updateMarkup (updateContent) chỉ EDIT existing blob — fail khi todo chưa có desc.
-    expect(client.uploadMarkup).toHaveBeenCalledWith(
+    // Existing description → updateMarkup (updateContent rpc) edit content in-place.
+    // uploadMarkup/createMarkup chỉ tạo initial version — KHÔNG update doc tồn tại.
+    expect(client.updateMarkup).toHaveBeenCalledWith(
       "time:class:ToDo",
       "t1",
       "description",
       "new text",
       "markdown",
     );
-    expect(client.updateMarkup).not.toHaveBeenCalled();
+    expect(client.uploadMarkup).not.toHaveBeenCalled();
     expect(result.details).toMatchObject({ updated: true });
     expect((result.details as { fields: string[] }).fields).toContain("description");
   });
 
-  it("description (no existing ref) → uploadMarkup creates blob (works regardless)", async () => {
+  it("todo CHƯA có description → uploadMarkup tạo blob + swap ref", async () => {
     const client = makeClient();
     client.findOne = vi.fn().mockResolvedValueOnce({ _id: "t1", space: "sp1" }); // no description
     vi.mocked(getClient).mockResolvedValue(client as never);
@@ -134,7 +134,6 @@ describe("T-79G #162: update_todo description uploadMarkup ref", () => {
     const tool = findTool("huly_update_todo");
     await tool.execute("tc1", { todo: "t1", description: "first text" }, undefined, undefined, ctx);
 
-    // uploadMarkup tạo blob mới → works dù todo chưa có description (KHÔNG updateMarkup).
     expect(client.uploadMarkup).toHaveBeenCalledWith(
       "time:class:ToDo",
       "t1",
@@ -143,6 +142,29 @@ describe("T-79G #162: update_todo description uploadMarkup ref", () => {
       "markdown",
     );
     expect(client.updateMarkup).not.toHaveBeenCalled();
+  });
+
+  it("todo có description + updateMarkup unavailable (REST) → fallback uploadMarkup", async () => {
+    const client = makeClient();
+    client.updateMarkup = undefined as never;
+    client.findOne = vi.fn().mockResolvedValueOnce({
+      _id: "t1",
+      space: "sp1",
+      description: "existing-ref",
+    });
+    vi.mocked(getClient).mockResolvedValue(client as never);
+
+    const tool = findTool("huly_update_todo");
+    await tool.execute("tc1", { todo: "t1", description: "fallback" }, undefined, undefined, ctx);
+
+    // REST transport: updateMarkup không có → uploadMarkup (createContent) fallback.
+    expect(client.uploadMarkup).toHaveBeenCalledWith(
+      "time:class:ToDo",
+      "t1",
+      "description",
+      "fallback",
+      "markdown",
+    );
   });
 });
 
