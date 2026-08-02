@@ -36,6 +36,7 @@ const ctx = {
 
 function makeClient() {
   return {
+    transport: "ws",
     getCurrentUser: vi.fn().mockResolvedValue({ id: "u1", name: "User", email: "u@x.com" }),
     findAll: vi.fn().mockResolvedValue([]),
     findOne: vi.fn(),

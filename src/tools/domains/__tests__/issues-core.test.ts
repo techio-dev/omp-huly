@@ -42,6 +42,7 @@ const ctx = {
 
 function makeClient() {
   return {
+    transport: "ws",
     getCurrentUser: vi.fn().mockResolvedValue({ id: "u1", name: "User", email: "u@x.com" }),
     findAll: vi.fn().mockResolvedValue([]),
     findOne: vi.fn(),
@@ -701,7 +702,8 @@ describe("T-72 #80: update_issue description — updateMarkup (existing) vs uplo
 
   it("issue có description + updateMarkup unavailable (REST) → fallback uploadMarkup", async () => {
     const client = makeClient();
-    client.updateMarkup = undefined as never;
+    client.transport = "rest" as never;
+    client.updateMarkup = vi.fn(() => { throw new Error("updateMarkup not supported on REST transport"); }) as never;
     client.findOne = vi.fn().mockResolvedValueOnce({
       _id: "i1",
       space: "sp1",
@@ -720,7 +722,9 @@ describe("T-72 #80: update_issue description — updateMarkup (existing) vs uplo
       ctx,
     );
 
-    // REST transport: updateMarkup không có → uploadMarkup (createContent) fallback.
+    // REST transport: guard transport==="ws" false → fallback uploadMarkup (KHÔNG gọi
+    // updateMarkup throwing stub → KHÔNG crash). Reviewer fix: typeof check alone fail
+    // vì REST stub là function (throws), guard cũ = true → crash.
     expect(client.uploadMarkup).toHaveBeenCalledWith(
       ISSUE_CLASS,
       "i1",

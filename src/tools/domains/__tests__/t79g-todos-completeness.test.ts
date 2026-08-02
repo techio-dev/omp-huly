@@ -36,6 +36,7 @@ const ctx = { hasUI: false, cwd: "/proj", ui: { confirm: vi.fn() } } as never;
 
 function makeClient() {
   return {
+    transport: "ws",
     getCurrentUser: vi.fn().mockResolvedValue({ id: "u1", name: "U", email: "u@x.com" }),
     findAll: vi.fn().mockResolvedValue([]),
     findOne: vi.fn(),
