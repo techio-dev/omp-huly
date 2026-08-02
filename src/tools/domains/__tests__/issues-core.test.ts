@@ -703,7 +703,9 @@ describe("T-72 #80: update_issue description — updateMarkup (existing) vs uplo
   it("issue có description + updateMarkup unavailable (REST) → fallback uploadMarkup", async () => {
     const client = makeClient();
     client.transport = "rest" as never;
-    client.updateMarkup = vi.fn(() => { throw new Error("updateMarkup not supported on REST transport"); }) as never;
+    client.updateMarkup = vi.fn(() => {
+      throw new Error("updateMarkup not supported on REST transport");
+    }) as never;
     client.findOne = vi.fn().mockResolvedValueOnce({
       _id: "i1",
       space: "sp1",

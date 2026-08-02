@@ -250,7 +250,11 @@ export const tools: HulyToolDefinition[] = [
       if (params.description !== undefined) {
         const existingDesc =
           typeof c === "object" && "description" in c ? c.description : undefined;
-        if (existingDesc != null && tctx.client.transport === "ws" && typeof tctx.client.updateMarkup === "function") {
+        if (
+          existingDesc != null &&
+          tctx.client.transport === "ws" &&
+          typeof tctx.client.updateMarkup === "function"
+        ) {
           await tctx.client.updateMarkup(
             COMPONENT_CLASS,
             c._id,
