@@ -17,8 +17,8 @@
 //
 // Document model (verified trusted documents-edit.ts):
 //   - findAll/findOne DOCUMENT_CLASS + space=teamspace._id (scoping)
-//   - content = MarkupBlobRef → fetchMarkup (get) / uploadMarkup (create+edit).
-//     Library KHÔNG có updateMarkup — edit = uploadMarkup + updateDoc (new ref).
+//   - content = MarkupBlobRef → fetchMarkup (get) / uploadMarkup (create, first version) /
+//     updateMarkup (edit existing content in-place — #156; uploadMarkup no-op khi doc tồn tại).
 //   - parent: Ref<Document> (document hierarchy), rank (lexorank)
 
 import { z } from "zod";

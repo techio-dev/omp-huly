@@ -26,8 +26,9 @@
 //   4. link_document_to_issue 5. unlink_document_to_issue
 
 import { z } from "zod";
+import type { HulyClient } from "../../client/client.js";
 import { defineHulyTool, type HulyToolDefinition } from "../builder.js";
-import { ISSUE_CLASS } from "./_class-refs.js";
+import { DOCUMENT_CLASS, idRef, ISSUE_CLASS } from "./_class-refs.js";
 import {
   workspaceParam,
   projectParam,
@@ -45,6 +46,18 @@ function makeRelatedDoc(targetId: string): { _id: string; _class: string } {
 function hasRelation(arr: unknown[] | undefined, targetId: string): boolean {
   if (!Array.isArray(arr)) return false;
   return arr.some((r) => (r as { _id?: string })._id === targetId);
+}
+
+// T-97: resolve Document từ param (title hoặc _id). _id-first (caller truyền raw
+// _id), fallback name (caller truyền document title). Document field = `name`.
+// Unscoped (cross-teamspace) — Huly Document không thuộc project space.
+async function resolveDocument(
+  client: HulyClient,
+  document: string,
+): Promise<{ _id: string; name?: string } | undefined> {
+  const byId = await client.findOne(DOCUMENT_CLASS, { _id: idRef(document) });
+  if (byId) return byId;
+  return client.findOne(DOCUMENT_CLASS, { name: document });
 }
 
 export const tools: HulyToolDefinition[] = [
@@ -371,54 +384,114 @@ export const tools: HulyToolDefinition[] = [
     },
   }),
 
-  // 4. link_document_to_issue — T-60: honest-unavailable (DOCUMENT_CLASS orphan)
+  // 4. link_document_to_issue — T-97 re-enable: Document registered (T-65/T-66
+  // SUPERSEDES T-58/T-60 interface-orphan conclusion). Link = $push Issue.relations
+  // { _id: doc, _class: DOCUMENT_CLASS } — unidirectional (Issue→Document, khớp
+  // Huly UI Relations panel + @firfi/huly-mcp document-relations.ts).
   defineHulyTool({
     name: "link_document_to_issue",
     label: "Link document to issue",
     description:
-      "UNAVAILABLE — tracker:class:Document not registered runtime. Link doc↔issue via Huly UI.",
+      "Link a document to an issue (adds to issue.relations). document accepts title or _id. " +
+      "Idempotent — no-op if already linked.",
     needsProject: true,
     parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      document: z.string(),
+      document: z.string().describe("Document title or _id to link."),
     }),
-    async handler(_params, _tctx) {
+    async handler(params, tctx) {
+      const issue = await tctx.client.findOne(ISSUE_CLASS, {
+        identifier: resolveIdentifier(tctx.project!, params.identifier),
+      });
+      if (!issue) {
+        return {
+          content: `Issue "${params.identifier}" not found.`,
+          isError: true,
+          details: { identifier: params.identifier },
+        };
+      }
+      const doc = await resolveDocument(tctx.client, params.document);
+      if (!doc) {
+        return {
+          content: `Document "${params.document}" not found.`,
+          isError: true,
+          details: { document: params.document, identifier: params.identifier },
+        };
+      }
+      if (hasRelation((issue as { relations?: unknown[] }).relations, doc._id as string)) {
+        return {
+          content: `Document "${params.document}" already linked to ${params.identifier} (no-op).`,
+          details: { idempotent: true, document: params.document, documentId: doc._id },
+        };
+      }
+      const updResult = await safeUpdateDoc(tctx.client, ISSUE_CLASS, issue, {
+        $push: { relations: { _id: doc._id as string, _class: DOCUMENT_CLASS } },
+      });
+      if (!updResult.ok) return updResult.error;
       return {
-        content:
-          `link_document_to_issue KHÔNG khả dụng: Huly runtime class ` +
-          `"tracker:class:Document" KHÔNG register trong plugin() class block ` +
-          `(interface orphan — T-58 audit). Link doc↔issue qua Huly UI Relations ` +
-          `panel trực tiếp.`,
-        isError: true,
-        details: { reason: "interface_orphan", useClass: "tracker:class:Document" },
+        content: `Linked document "${params.document}" to ${params.identifier}.`,
+        details: {
+          identifier: params.identifier,
+          document: params.document,
+          documentId: doc._id,
+        },
       };
     },
   }),
 
-  // 5. unlink_document_to_issue — T-60: honest-unavailable (DOCUMENT_CLASS orphan)
+  // 5. unlink_document_to_issue — T-97 re-enable (mirror link, $pull). Idempotent.
   defineHulyTool({
     name: "unlink_document_to_issue",
     label: "Unlink document from issue",
     description:
-      "UNAVAILABLE — tracker:class:Document not registered runtime. Unlink doc↔issue via Huly UI.",
+      "Unlink a document from an issue (removes from issue.relations). document accepts title or _id. " +
+      "Idempotent — no-op if not linked.",
+    destructive: true,
     needsProject: true,
     parameters: z.object({
       workspace: workspaceParam,
       project: projectParam,
       identifier: identifierParam,
-      document: z.string(),
+      document: z.string().describe("Document title or _id to unlink."),
     }),
-    async handler(_params, _tctx) {
+    async handler(params, tctx) {
+      const issue = await tctx.client.findOne(ISSUE_CLASS, {
+        identifier: resolveIdentifier(tctx.project!, params.identifier),
+      });
+      if (!issue) {
+        return {
+          content: `Issue "${params.identifier}" not found.`,
+          isError: true,
+          details: { identifier: params.identifier },
+        };
+      }
+      const doc = await resolveDocument(tctx.client, params.document);
+      if (!doc) {
+        return {
+          content: `Document "${params.document}" not found.`,
+          isError: true,
+          details: { document: params.document, identifier: params.identifier },
+        };
+      }
+      if (!hasRelation((issue as { relations?: unknown[] }).relations, doc._id as string)) {
+        return {
+          content: `Document "${params.document}" not linked to ${params.identifier} (no-op).`,
+          details: { idempotent: true, document: params.document, documentId: doc._id },
+        };
+      }
+      const updResult = await safeUpdateDoc(tctx.client, ISSUE_CLASS, issue, {
+        $pull: { relations: { _id: doc._id as string } },
+      });
+      if (!updResult.ok) return updResult.error;
       return {
-        content:
-          `unlink_document_to_issue KHÔNG khả dụng: Huly runtime class ` +
-          `"tracker:class:Document" KHÔNG register trong plugin() class block ` +
-          `(interface orphan — T-58 audit). Unlink doc↔issue qua Huly UI ` +
-          `Relations panel trực tiếp.`,
-        isError: true,
-        details: { reason: "interface_orphan", useClass: "tracker:class:Document" },
+        content: `Unlinked document "${params.document}" from ${params.identifier}.`,
+        details: {
+          identifier: params.identifier,
+          document: params.document,
+          documentId: doc._id,
+        },
       };
     },
   }),

@@ -522,17 +522,41 @@ export const tools: HulyToolDefinition[] = [
           };
         ops.title = params.title;
       }
-      // T-72 #80: description = MarkupBlobRef. Library KHÔNG có updateMarkup —
-      // luôn uploadMarkup (new version) + ops.description = ref.
+      // T-97: description = MarkupBlobRef. Issue ĐÃ CÓ description → updateMarkup
+      // (updateContent rpc) edit content in-place. KHÔNG ghi description vào ops —
+      // mirror trusted @firfi/huly-mcp (calendar.ts:321, cards.ts:350): updateMarkup
+      // xong return {} (empty ops), updateDoc KHÔNG đụng description field. TX cũ ghi
+      // existingDesc vào ops → TxUpdateDoc trên description field có thể trigger server
+      // re-process → reset collaborator content → description stale (repro VPSM-58/34).
+      // Issue CHƯA có → uploadMarkup tạo blob + swap ref (ghi ref vào ops).
+      // Track descUpdated riêng cho success message (updateMarkup path không thêm ops).
+      let descUpdated = false;
       if (params.description !== undefined) {
-        const ref = await tctx.client.uploadMarkup(
-          ISSUE_CLASS,
-          issue._id,
-          "description",
-          params.description,
-          "markdown",
-        );
-        ops.description = ref;
+        const existingDesc =
+          typeof issue === "object" && "description" in issue ? issue.description : undefined;
+        if (
+          existingDesc != null &&
+          tctx.client.transport === "ws" &&
+          typeof tctx.client.updateMarkup === "function"
+        ) {
+          await tctx.client.updateMarkup(
+            ISSUE_CLASS,
+            issue._id,
+            "description",
+            params.description,
+            "markdown",
+          );
+          descUpdated = true;
+        } else {
+          ops.description = await tctx.client.uploadMarkup(
+            ISSUE_CLASS,
+            issue._id,
+            "description",
+            params.description,
+            "markdown",
+          );
+          descUpdated = true;
+        }
       }
       if (params.priority !== undefined) ops.priority = params.priority;
       if (params.assignee !== undefined) {
@@ -623,12 +647,17 @@ export const tools: HulyToolDefinition[] = [
         }
         ops.status = match._id;
       }
-      if (Object.keys(ops).length === 0) {
+      // T-97: updateMarkup path (descUpdated + empty ops) → skip updateDoc (content
+      // đã update qua collaborator, KHÔNG cần TxUpdateDoc trên description field).
+      if (Object.keys(ops).length === 0 && !descUpdated) {
         return { content: "No fields to update.", details: { updated: false } };
       }
-      const updResult = await safeUpdateDoc(tctx.client, ISSUE_CLASS, issue, ops);
-      if (!updResult.ok) return updResult.error;
+      if (Object.keys(ops).length > 0) {
+        const updResult = await safeUpdateDoc(tctx.client, ISSUE_CLASS, issue, ops);
+        if (!updResult.ok) return updResult.error;
+      }
       const fields = Object.keys(ops);
+      if (descUpdated && !fields.includes("description")) fields.push("description");
       return {
         content: `Updated issue ${params.identifier}: ${fields.join(", ")}`,
         details: { updated: true, identifier: params.identifier, fields },

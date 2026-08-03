@@ -1,6 +1,6 @@
 {
   "name": "omp-huly",
-  "version": "0.2.4",
+  "version": "0.2.6",
   "description": "Native Huly support cho oh-my-pi (omp) — tools (KHÔNG MCP, gọi thẳng WebSocket API). Fork của pi-huly.",
   "keywords": [
     "huly",

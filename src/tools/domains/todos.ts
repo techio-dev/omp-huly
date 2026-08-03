@@ -274,19 +274,37 @@ export const tools: HulyToolDefinition[] = [
           };
         ops.title = params.title;
       }
-      // T-103 #162: description = MarkupBlobRef → uploadMarkup ref + ops.description.
-      // Mirror update_issue (R11 proven persist). #106 trước dùng updateMarkup
-      // (updateContent) — chỉ EDIT blob existing, FAIL khi todo chưa có description
-      // (create without desc). uploadMarkup tạo blob mới + swap ref → works luôn.
+      // T-97: description = MarkupBlobRef. Todo ĐÃ CÓ description → updateMarkup
+      // (updateContent rpc) edit in-place. KHÔNG ghi description vào ops — mirror trusted
+      // @firfi/huly-mcp (TxUpdateDoc trên description → server reset collaborator → stale).
+      // CHƯA có → uploadMarkup tạo blob + swap ref. Track descUpdated riêng cho success.
+      let descUpdated = false;
       if (params.description !== undefined) {
-        const ref = await tctx.client.uploadMarkup(
-          TODO_CLASS,
-          t._id,
-          "description",
-          params.description,
-          "markdown",
-        );
-        ops.description = ref;
+        const existingDesc =
+          typeof t === "object" && t !== null && "description" in t ? t.description : undefined;
+        if (
+          existingDesc != null &&
+          tctx.client.transport === "ws" &&
+          typeof tctx.client.updateMarkup === "function"
+        ) {
+          await tctx.client.updateMarkup(
+            TODO_CLASS,
+            t._id,
+            "description",
+            params.description,
+            "markdown",
+          );
+          descUpdated = true;
+        } else {
+          ops.description = await tctx.client.uploadMarkup(
+            TODO_CLASS,
+            t._id,
+            "description",
+            params.description,
+            "markdown",
+          );
+          descUpdated = true;
+        }
       }
       // T-79G #106: owner → user: Ref<Employee> (resolve Person).
       if (params.owner !== undefined) {
@@ -313,7 +331,7 @@ export const tools: HulyToolDefinition[] = [
           ops.dueDate = params.dueDate;
         }
       }
-      if (Object.keys(ops).length === 0) {
+      if (Object.keys(ops).length === 0 && !descUpdated) {
         return { content: "No fields to update.", details: { updated: false } };
       }
       if (Object.keys(ops).length > 0) {
@@ -322,6 +340,7 @@ export const tools: HulyToolDefinition[] = [
       }
       const fields = Object.keys(ops).filter((f) => f !== "$unset");
       if (ops.$unset !== undefined) fields.push("dueDate(clear)");
+      if (descUpdated && !fields.includes("description")) fields.push("description");
       return {
         content: `Updated todo ${params.todo}: ${fields.join(", ")}`,
         details: { updated: true, fields },
